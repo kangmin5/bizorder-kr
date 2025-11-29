@@ -1,0 +1,61 @@
+/* A4 용지 비율 및 문서 페이지 스타일 */
+.document-page {
+  background: white;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  margin: 0 auto;
+  page-break-after: always;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 세로 방향 - A4 비율 (210mm x 297mm = 1:1.414) */
+.document-page[data-orientation="portrait"] {
+  width: 210mm;
+  min-height: 297mm;
+  max-height: 297mm;
+}
+
+/* 가로 방향 - A4 비율 (297mm x 210mm) */
+.document-page[data-orientation="landscape"] {
+  width: 297mm;
+  min-height: 210mm;
+  max-height: 210mm;
+}
+
+.document-content {
+  padding: 20mm;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* PDF 생성을 위한 페이지 구분 */
+.quotation-page,
+.purchase-order-page,
+.transaction-statement-page {
+  page-break-inside: avoid;
+}
+
+/* 인쇄 스타일 */
+@media print {
+  .document-page {
+    box-shadow: none;
+    margin: 0;
+    page-break-after: always;
+  }
+  
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}
+
+/* 테이블 스타일 조정 */
+.document-page table {
+  font-size: 0.9rem;
+}
+
+.document-page th,
+.document-page td {
+  padding: 0.4rem;
+  vertical-align: middle;
+}
