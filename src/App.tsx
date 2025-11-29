@@ -3,6 +3,8 @@ import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { QuotationPage } from './components/QuotationPage';
 import { PurchaseOrderPage } from './components/PurchaseOrderPage';
+// Transaction Statement Page
+// import { TransactionStatementPage } from './components/TransactionStatementPage';
 import { TransactionStatementPage } from './components/TransactionStatementPage';
 import { SubscriptionPage } from './components/SubscriptionPage';
 import { DashboardPage } from './components/DashboardPage';
