@@ -335,8 +335,19 @@ export function SettingsPage() {
                   <Input id="user-name" defaultValue="홍길동" />
                 </div>
                 <div>
-                  <Label htmlFor="user-position">직책</Label>
+                  <Label htmlFor="user-department">부서/팀</Label>
+                  <Input id="user-department" defaultValue="경영지원팀" />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="user-position">직위/직책</Label>
                   <Input id="user-position" defaultValue="대표" />
+                </div>
+                <div>
+                  <Label htmlFor="user-phone">휴대전화</Label>
+                  <Input id="user-phone" defaultValue="010-1234-5678" />
                 </div>
               </div>
 
@@ -352,11 +363,6 @@ export function SettingsPage() {
                 <p className="text-xs text-gray-500 mt-1">
                   이메일 주소는 변경할 수 없습니다.
                 </p>
-              </div>
-
-              <div>
-                <Label htmlFor="user-phone">휴대전화</Label>
-                <Input id="user-phone" defaultValue="010-1234-5678" />
               </div>
 
               <Separator className="my-4" />
