@@ -6,10 +6,12 @@ import {
   FileSpreadsheet,
   Download,
   Settings2,
+  PanelLeft,
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
+import { type ImperativePanelHandle } from "react-resizable-panels";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable";
 
 import { Button } from './ui/button';
@@ -153,6 +155,8 @@ const EditableTextarea = ({
 export function QuotationPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [zoom, setZoom] = useState(100);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const sidebarRef = useRef<ImperativePanelHandle>(null);
   const [settings, setSettings] = useState<PageSettings>({
     paperSize: 'A4',
     orientation: 'portrait',
@@ -317,10 +321,21 @@ export function QuotationPage() {
     }
   };
 
+  const toggleSidebar = () => {
+    const panel = sidebarRef.current;
+    if (panel) {
+      if (isSidebarOpen) panel.collapse();
+      else panel.expand();
+    }
+  };
+
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col">
       <div className="border-b bg-white p-4 flex justify-between items-center z-10">
         <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" onClick={toggleSidebar} title={isSidebarOpen ? "사이드바 숨기기" : "사이드바 열기"}>
+            <PanelLeft className="w-5 h-5" />
+          </Button>
           <h1 className="text-xl font-bold">견적서 작성</h1>
           <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1 text-sm">
             <Button 
@@ -358,7 +373,16 @@ export function QuotationPage() {
 
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         {/* Left Sidebar: Settings */}
-        <ResizablePanel defaultSize={25} minSize={20} maxSize={40} className="bg-gray-50 border-r">
+        <ResizablePanel 
+          ref={sidebarRef}
+          defaultSize={25} 
+          minSize={20} 
+          maxSize={40} 
+          collapsible={true}
+          onCollapse={() => setIsSidebarOpen(false)}
+          onExpand={() => setIsSidebarOpen(true)}
+          className={cn("bg-gray-50 border-r", !isSidebarOpen && "min-w-[0px] border-none")}
+        >
           <div className="h-full overflow-auto">
             <div className="p-4 space-y-6">
               <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
