@@ -1,27 +1,21 @@
-import  { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
   Printer, 
-  Share2, 
   Plus, 
   Trash2, 
-  Mail,
-  MessageCircle,
   FileSpreadsheet,
-  Download
+  Download,
+  Settings2,
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable";
 
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Textarea } from './ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Checkbox } from './ui/checkbox';
 import { cn } from '@/lib/utils';
 
@@ -55,8 +49,8 @@ interface PurchaseOrderData {
   orderNumber: string;
   date: string;
   deliveryDate: string;
-  deliveryPlace: string; // 납품 장소
-  inspectionMethod: string; // 검수 방법
+  deliveryPlace: string;
+  inspectionMethod: string;
   supplier: CompanyInfo;
   client: CompanyInfo;
   items: LineItem[];
@@ -99,11 +93,65 @@ const PAPER_DIMENSIONS: Record<PaperSize, { width: number; height: number }> = {
   B5: { width: 176, height: 250 },
 };
 
-// --- Component ---
+// --- Helper Components ---
+
+const EditableInput = ({ 
+  value, 
+  onChange, 
+  className, 
+  placeholder, 
+  type = "text",
+  align = "left" 
+}: { 
+  value: string | number; 
+  onChange: (val: string) => void; 
+  className?: string;
+  placeholder?: string;
+  type?: string;
+  align?: "left" | "center" | "right";
+}) => (
+  <input
+    type={type}
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    placeholder={placeholder}
+    className={cn(
+      "bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-0.5 w-full transition-colors",
+      align === "center" && "text-center",
+      align === "right" && "text-right",
+      className
+    )}
+  />
+);
+
+const EditableTextarea = ({ 
+  value, 
+  onChange, 
+  className, 
+  placeholder,
+  rows = 1
+}: { 
+  value: string; 
+  onChange: (val: string) => void; 
+  className?: string;
+  placeholder?: string;
+  rows?: number;
+}) => (
+  <textarea
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    placeholder={placeholder}
+    rows={rows}
+    className={cn(
+      "bg-transparent border border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-0.5 w-full resize-none transition-colors",
+      className
+    )}
+  />
+);
 
 export function PurchaseOrderPage() {
-  const [activeTab, setActiveTab] = useState('edit');
   const [isLoading, setIsLoading] = useState(false);
+  const [zoom, setZoom] = useState(100);
   const [settings, setSettings] = useState<PageSettings>({
     paperSize: 'A4',
     orientation: 'portrait',
@@ -268,358 +316,414 @@ export function PurchaseOrderPage() {
   };
 
   return (
-    <div className="container mx-auto py-6 max-w-[1600px]">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">발주서 작성</h1>
-          <p className="text-muted-foreground">협력업체에 발주서를 전송하세요.</p>
+    <div className="h-[calc(100vh-4rem)] flex flex-col">
+      <div className="border-b bg-white p-4 flex justify-between items-center z-10">
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-bold">발주서 작성</h1>
+          <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1 text-sm">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 px-2" 
+              onClick={() => setZoom(Math.max(50, zoom - 10))}
+            >
+              -
+            </Button>
+            <span className="w-12 text-center">{zoom}%</span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 px-2" 
+              onClick={() => setZoom(Math.min(200, zoom + 10))}
+            >
+              +
+            </Button>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => window.print()}>
             <Printer className="w-4 h-4 mr-2" /> 인쇄
           </Button>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Share2 className="w-4 h-4 mr-2" /> 공유
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>발주서 공유</DialogTitle>
-                <DialogDescription>발주서를 협력사에 전송합니다.</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <Button variant="outline" className="h-20 flex-col gap-2">
-                    <Mail className="w-6 h-6" /> 이메일 발송
-                  </Button>
-                  <Button variant="outline" className="h-20 flex-col gap-2">
-                    <MessageCircle className="w-6 h-6" /> 카카오톡 공유
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
           <Button variant="outline" onClick={handleExportExcel}>
-            <FileSpreadsheet className="w-4 h-4 mr-2" /> 엑셀 저장
+            <FileSpreadsheet className="w-4 h-4 mr-2" /> 엑셀
           </Button>
           <Button onClick={handleExportPDF} disabled={isLoading}>
-            <Download className="w-4 h-4 mr-2" /> {isLoading ? '생성 중...' : 'PDF 다운로드'}
+            <Download className="w-4 h-4 mr-2" /> 
+            {isLoading ? '생성 중...' : 'PDF'}
           </Button>
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="edit">작성 및 수정</TabsTrigger>
-          <TabsTrigger value="preview">미리보기</TabsTrigger>
-        </TabsList>
+      <ResizablePanelGroup direction="horizontal" className="flex-1">
+        <ResizablePanel defaultSize={25} minSize={20} maxSize={40} className="bg-gray-50 border-r">
+          <div className="h-full overflow-auto">
+            <div className="p-4 space-y-6">
+              <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+                <Settings2 className="w-5 h-5" />
+                문서 설정
+              </div>
 
-        <TabsContent value="edit" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Basic Info */}
-            <div className="space-y-6">
               <Card>
-                <CardHeader><CardTitle>발주 정보</CardTitle></CardHeader>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">스타일 & 레이아웃</CardTitle>
+                </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>발주번호</Label>
-                      <Input value={data.orderNumber} onChange={(e) => setData({...data, orderNumber: e.target.value})} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>발주일자</Label>
-                      <Input type="date" value={data.date} onChange={(e) => setData({...data, date: e.target.value})} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>납기일자</Label>
-                      <Input type="date" value={data.deliveryDate} onChange={(e) => setData({...data, deliveryDate: e.target.value})} />
-                    </div>
+                  <div className="space-y-2">
+                    <Label>용지 크기</Label>
+                    <Select 
+                      value={settings.paperSize} 
+                      onValueChange={(v: PaperSize) => setSettings({...settings, paperSize: v})}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="A4">A4</SelectItem>
+                        <SelectItem value="A3">A3</SelectItem>
+                        <SelectItem value="B5">B5</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>납품 장소</Label>
-                    <Input value={data.deliveryPlace} onChange={(e) => setData({...data, deliveryPlace: e.target.value})} />
+                    <Label>용지 방향</Label>
+                    <Select 
+                      value={settings.orientation} 
+                      onValueChange={(v: Orientation) => setSettings({...settings, orientation: v})}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="portrait">세로</SelectItem>
+                        <SelectItem value="landscape">가로</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>검수 방법</Label>
-                    <Input value={data.inspectionMethod} onChange={(e) => setData({...data, inspectionMethod: e.target.value})} />
+                    <Label>테마 선택</Label>
+                    <Select 
+                      value={settings.theme} 
+                      onValueChange={(v: Theme) => setSettings({...settings, theme: v})}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="classic">클래식 (기본)</SelectItem>
+                        <SelectItem value="modern">모던 (그린 포인트)</SelectItem>
+                        <SelectItem value="minimal">미니멀</SelectItem>
+                        <SelectItem value="bold">볼드</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader><CardTitle>공급자 정보 (수신)</CardTitle></CardHeader>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">옵션</CardTitle>
+                </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>상호명</Label>
-                    <Input value={data.supplier.name} onChange={(e) => setData({...data, supplier: {...data.supplier, name: e.target.value}})} placeholder="거래처 상호" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>담당자</Label>
-                      <Input value={data.supplier.ownerName} onChange={(e) => setData({...data, supplier: {...data.supplier, ownerName: e.target.value}})} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>연락처</Label>
-                      <Input value={data.supplier.phone} onChange={(e) => setData({...data, supplier: {...data.supplier, phone: e.target.value}})} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>이메일</Label>
-                    <Input value={data.supplier.email} onChange={(e) => setData({...data, supplier: {...data.supplier, email: e.target.value}})} />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Settings & Client */}
-            <div className="space-y-6">
-              <Card>
-                <CardHeader><CardTitle>문서 설정</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>용지 크기</Label>
-                      <Select value={settings.paperSize} onValueChange={(v: PaperSize) => setSettings({...settings, paperSize: v})}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="A4">A4</SelectItem>
-                          <SelectItem value="A3">A3</SelectItem>
-                          <SelectItem value="B5">B5</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>방향</Label>
-                      <Select value={settings.orientation} onValueChange={(v: Orientation) => setSettings({...settings, orientation: v})}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="portrait">세로</SelectItem>
-                          <SelectItem value="landscape">가로</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2 pt-2">
-                    <Checkbox id="vat" checked={data.vatIncluded} onCheckedChange={(c) => setData({...data, vatIncluded: !!c})} />
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="vat" 
+                      checked={data.vatIncluded}
+                      onCheckedChange={(c) => setData({...data, vatIncluded: !!c})}
+                    />
                     <Label htmlFor="vat">부가세 포함</Label>
                   </div>
                 </CardContent>
               </Card>
             </div>
           </div>
+        </ResizablePanel>
 
-          {/* Items Table */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>발주 품목</CardTitle>
-              <Button onClick={addItem} size="sm"><Plus className="w-4 h-4 mr-2" /> 추가</Button>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>No</TableHead>
-                    <TableHead>품명</TableHead>
-                    <TableHead>규격</TableHead>
-                    <TableHead>단위</TableHead>
-                    <TableHead>수량</TableHead>
-                    <TableHead>단가</TableHead>
-                    <TableHead>공급가액</TableHead>
-                    <TableHead>비고</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.items.map((item, index) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="text-center">{index + 1}</TableCell>
-                      <TableCell><Input value={item.name} onChange={(e) => handleItemChange(item.id, 'name', e.target.value)} /></TableCell>
-                      <TableCell><Input value={item.spec} onChange={(e) => handleItemChange(item.id, 'spec', e.target.value)} /></TableCell>
-                      <TableCell><Input value={item.unit} onChange={(e) => handleItemChange(item.id, 'unit', e.target.value)} /></TableCell>
-                      <TableCell><Input type="number" value={item.quantity} onChange={(e) => handleItemChange(item.id, 'quantity', Number(e.target.value))} className="text-right" /></TableCell>
-                      <TableCell><Input type="number" value={item.unitPrice} onChange={(e) => handleItemChange(item.id, 'unitPrice', Number(e.target.value))} className="text-right" /></TableCell>
-                      <TableCell className="text-right">{item.amount.toLocaleString()}</TableCell>
-                      <TableCell><Input value={item.note} onChange={(e) => handleItemChange(item.id, 'note', e.target.value)} /></TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => removeItem(item.id)} className="text-red-500"><Trash2 className="w-4 h-4" /></Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              
-              <div className="flex justify-end mt-4">
-                <div className="w-[300px] space-y-2">
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>합계</span>
-                    <span className="text-blue-600">{data.total.toLocaleString()} 원</span>
+        <ResizableHandle withHandle />
+
+        <ResizablePanel defaultSize={75} className="bg-slate-100">
+          <div className="h-full overflow-auto">
+            <div className="flex justify-center p-8 min-w-[800px]">
+              <div 
+                ref={printRef}
+                className={cn(
+                  "shadow-lg transition-all duration-300 p-[10mm] box-border relative bg-white",
+                  renderThemeStyles()
+                )}
+                style={{
+                  width: `${getPaperDimensions().width}mm`,
+                  minHeight: `${getPaperDimensions().height}mm`,
+                  transform: `scale(${zoom / 100})`,
+                  transformOrigin: 'top center',
+                }}
+              >
+                {/* Header */}
+                <div className="text-center mb-8">
+                  <h1 className="text-4xl font-bold tracking-[1em] underline decoration-double underline-offset-8">발 주 서</h1>
+                </div>
+
+                <div className="flex justify-between mb-8 text-sm">
+                  <div className="w-[45%]">
+                    <table className="w-full border-collapse border border-black">
+                      <tbody>
+                        <tr>
+                          <td className="border border-black bg-gray-100 p-2 text-center w-24 font-bold">발주번호</td>
+                          <td className="border border-black p-0">
+                            <EditableInput 
+                              value={data.orderNumber} 
+                              onChange={(v) => setData({...data, orderNumber: v})}
+                              className="px-2"
+                            />
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-black bg-gray-100 p-2 text-center font-bold">발주일자</td>
+                          <td className="border border-black p-0">
+                            <EditableInput 
+                              type="date"
+                              value={data.date} 
+                              onChange={(v) => setData({...data, date: v})}
+                              className="px-2"
+                            />
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-black bg-gray-100 p-2 text-center font-bold">납기일자</td>
+                          <td className="border border-black p-0">
+                            <EditableInput 
+                              type="date"
+                              value={data.deliveryDate} 
+                              onChange={(v) => setData({...data, deliveryDate: v})}
+                              className="px-2"
+                            />
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="w-[45%]">
+                    <table className="w-full border-collapse border border-black">
+                      <tbody>
+                        <tr>
+                          <td rowSpan={4} className="border border-black bg-gray-100 p-2 text-center w-8 font-bold writing-mode-vertical">발주자</td>
+                          <td className="border border-black p-1 text-center w-16 bg-gray-50">상호</td>
+                          <td className="border border-black p-0">
+                            <EditableInput 
+                              value={data.client.name} 
+                              onChange={(v) => setData({...data, client: {...data.client, name: v}})}
+                            />
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-black p-1 text-center bg-gray-50">등록번호</td>
+                          <td className="border border-black p-0">
+                            <EditableInput 
+                              value={data.client.registrationNumber} 
+                              onChange={(v) => setData({...data, client: {...data.client, registrationNumber: v}})}
+                            />
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-black p-1 text-center bg-gray-50">대표자</td>
+                          <td className="border border-black p-0">
+                            <EditableInput 
+                              value={data.client.ownerName} 
+                              onChange={(v) => setData({...data, client: {...data.client, ownerName: v}})}
+                            />
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-black p-1 text-center bg-gray-50">주소</td>
+                          <td className="border border-black p-0">
+                            <EditableInput 
+                              value={data.client.address} 
+                              onChange={(v) => setData({...data, client: {...data.client, address: v}})}
+                            />
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardContent className="pt-6 space-y-4">
-              <div className="space-y-2">
-                <Label>특이사항 및 비고</Label>
-                <Textarea value={data.remarks} onChange={(e) => setData({...data, remarks: e.target.value})} rows={4} />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="preview" className="flex justify-center bg-slate-100 p-8 rounded-lg overflow-auto">
-          <div 
-            ref={printRef}
-            className={cn(
-              "shadow-lg p-[10mm] box-border relative",
-              renderThemeStyles()
-            )}
-            style={{
-              width: `${getPaperDimensions().width}mm`,
-              minHeight: `${getPaperDimensions().height}mm`,
-            }}
-          >
-            <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold tracking-[1em] underline decoration-double underline-offset-8">발 주 서</h1>
-            </div>
-
-            <div className="flex justify-between mb-8 text-sm">
-              <div className="w-[45%]">
-                <table className="w-full border-collapse border border-black">
-                  <tbody>
-                    <tr>
-                      <td className="border border-black bg-gray-100 p-2 text-center w-24 font-bold">발주번호</td>
-                      <td className="border border-black p-2">{data.orderNumber}</td>
-                    </tr>
-                    <tr>
-                      <td className="border border-black bg-gray-100 p-2 text-center font-bold">발주일자</td>
-                      <td className="border border-black p-2">{data.date}</td>
-                    </tr>
-                    <tr>
-                      <td className="border border-black bg-gray-100 p-2 text-center font-bold">납기일자</td>
-                      <td className="border border-black p-2">{data.deliveryDate}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div className="w-[45%]">
-                <table className="w-full border-collapse border border-black">
-                  <tbody>
-                    <tr>
-                      <td rowSpan={4} className="border border-black bg-gray-100 p-2 text-center w-8 font-bold writing-mode-vertical">발주자</td>
-                      <td className="border border-black p-1 text-center w-16">상호</td>
-                      <td className="border border-black p-1">{data.client.name}</td>
-                    </tr>
-                    <tr>
-                      <td className="border border-black p-1 text-center">등록번호</td>
-                      <td className="border border-black p-1">{data.client.registrationNumber}</td>
-                    </tr>
-                    <tr>
-                      <td className="border border-black p-1 text-center">대표자</td>
-                      <td className="border border-black p-1">{data.client.ownerName}</td>
-                    </tr>
-                    <tr>
-                      <td className="border border-black p-1 text-center">주소</td>
-                      <td className="border border-black p-1">{data.client.address}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <div className="flex items-baseline gap-2 border-b-2 border-black pb-2 mb-2">
-                <span className="text-xl font-bold">{data.supplier.name}</span>
-                <span className="text-lg">귀하</span>
-              </div>
-              <p>아래와 같이 발주하오니 기일 엄수하여 납품 바랍니다.</p>
-            </div>
-
-            <table className="w-full border-collapse border border-black mb-6 text-sm">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="border border-black p-2 w-12">No</th>
-                  <th className="border border-black p-2">품명</th>
-                  <th className="border border-black p-2 w-20">규격</th>
-                  <th className="border border-black p-2 w-16">단위</th>
-                  <th className="border border-black p-2 w-16">수량</th>
-                  <th className="border border-black p-2 w-24">단가</th>
-                  <th className="border border-black p-2 w-28">공급가액</th>
-                  <th className="border border-black p-2 w-20">비고</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.items.map((item, index) => (
-                  <tr key={item.id}>
-                    <td className="border border-black p-2 text-center">{index + 1}</td>
-                    <td className="border border-black p-2">{item.name}</td>
-                    <td className="border border-black p-2 text-center">{item.spec}</td>
-                    <td className="border border-black p-2 text-center">{item.unit}</td>
-                    <td className="border border-black p-2 text-right">{item.quantity.toLocaleString()}</td>
-                    <td className="border border-black p-2 text-right">{item.unitPrice.toLocaleString()}</td>
-                    <td className="border border-black p-2 text-right">{item.amount.toLocaleString()}</td>
-                    <td className="border border-black p-2">{item.note}</td>
-                  </tr>
-                ))}
-                 {Array.from({ length: Math.max(0, 10 - data.items.length) }).map((_, i) => (
-                  <tr key={`empty-${i}`}>
-                    <td className="border border-black p-2 text-center">&nbsp;</td>
-                    <td className="border border-black p-2"></td>
-                    <td className="border border-black p-2"></td>
-                    <td className="border border-black p-2"></td>
-                    <td className="border border-black p-2"></td>
-                    <td className="border border-black p-2"></td>
-                    <td className="border border-black p-2"></td>
-                    <td className="border border-black p-2"></td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="bg-gray-100">
-                  <td colSpan={6} className="border border-black p-2 text-center font-bold text-lg">합 계 (VAT 포함)</td>
-                  <td colSpan={2} className="border border-black p-2 text-right font-bold text-lg">{data.total.toLocaleString()} 원</td>
-                </tr>
-              </tfoot>
-            </table>
-
-            <div className="border border-black p-4 text-sm space-y-2">
-              <div className="flex gap-4">
-                <span className="font-bold w-24">납품 장소</span>
-                <span>{data.deliveryPlace}</span>
-              </div>
-              <div className="flex gap-4">
-                <span className="font-bold w-24">검수 방법</span>
-                <span>{data.inspectionMethod}</span>
-              </div>
-              <div className="flex gap-4">
-                <span className="font-bold w-24">결제 조건</span>
-                <span>{data.paymentTerms}</span>
-              </div>
-              {data.remarks && (
-                <div className="flex gap-4 mt-2 pt-2 border-t border-gray-300">
-                  <span className="font-bold w-24">특이사항</span>
-                  <span className="whitespace-pre-wrap">{data.remarks}</span>
+                <div className="mb-4">
+                  <div className="flex items-baseline gap-2 border-b-2 border-black pb-2 mb-2">
+                    <EditableInput 
+                      value={data.supplier.name} 
+                      onChange={(v) => setData({...data, supplier: {...data.supplier, name: v}})}
+                      placeholder="수신 (공급자 상호)"
+                      className="text-xl font-bold w-64"
+                    />
+                    <span className="text-lg">귀하</span>
+                  </div>
+                  <div className="flex gap-4 text-sm mb-2">
+                    <div className="flex items-center gap-2">
+                      <span>담당자:</span>
+                      <EditableInput 
+                        value={data.supplier.ownerName} 
+                        onChange={(v) => setData({...data, supplier: {...data.supplier, ownerName: v}})}
+                        placeholder="담당자명"
+                        className="w-32"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span>연락처:</span>
+                      <EditableInput 
+                        value={data.supplier.phone} 
+                        onChange={(v) => setData({...data, supplier: {...data.supplier, phone: v}})}
+                        placeholder="연락처"
+                        className="w-40"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-sm">아래와 같이 발주하오니 기일 엄수하여 납품 바랍니다.</p>
                 </div>
-              )}
-            </div>
-            
-            <div className="mt-12 flex justify-end">
-              <div className="text-center">
-                <p className="mb-4 text-sm">위와 같이 발주합니다.</p>
-                <div className="flex items-end gap-2">
-                  <span className="text-lg font-bold">발주 담당자 : </span>
-                  <span className="text-lg border-b border-black px-8 pb-1"></span>
-                  <span className="text-sm">(인)</span>
+
+                {/* Items Table */}
+                <div className="relative">
+                  <table className="w-full border-collapse border border-black mb-6 text-sm">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="border border-black p-2 w-12">No</th>
+                        <th className="border border-black p-2">품명</th>
+                        <th className="border border-black p-2 w-20">규격</th>
+                        <th className="border border-black p-2 w-16">단위</th>
+                        <th className="border border-black p-2 w-16">수량</th>
+                        <th className="border border-black p-2 w-24">단가</th>
+                        <th className="border border-black p-2 w-28">공급가액</th>
+                        <th className="border border-black p-2 w-20">비고</th>
+                        <th className="border border-black p-1 w-8 print:hidden bg-white border-l-0"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.items.map((item, index) => (
+                        <tr key={item.id} className="group hover:bg-green-50/30">
+                          <td className="border border-black p-1 text-center bg-gray-50">{index + 1}</td>
+                          <td className="border border-black p-0">
+                            <EditableInput 
+                              value={item.name} 
+                              onChange={(v) => handleItemChange(item.id, 'name', v)}
+                              className="h-full px-2"
+                            />
+                          </td>
+                          <td className="border border-black p-0">
+                            <EditableInput 
+                              value={item.spec} 
+                              onChange={(v) => handleItemChange(item.id, 'spec', v)}
+                              align="center"
+                              className="h-full px-1"
+                            />
+                          </td>
+                          <td className="border border-black p-0">
+                            <EditableInput 
+                              value={item.unit} 
+                              onChange={(v) => handleItemChange(item.id, 'unit', v)}
+                              align="center"
+                              className="h-full px-1"
+                            />
+                          </td>
+                          <td className="border border-black p-0">
+                            <EditableInput 
+                              type="number"
+                              value={item.quantity} 
+                              onChange={(v) => handleItemChange(item.id, 'quantity', Number(v))}
+                              align="right"
+                              className="h-full px-2"
+                            />
+                          </td>
+                          <td className="border border-black p-0">
+                            <EditableInput 
+                              type="number"
+                              value={item.unitPrice} 
+                              onChange={(v) => handleItemChange(item.id, 'unitPrice', Number(v))}
+                              align="right"
+                              className="h-full px-2"
+                            />
+                          </td>
+                          <td className="border border-black p-1 text-right font-medium bg-gray-50/50">
+                            {item.amount.toLocaleString()}
+                          </td>
+                          <td className="border border-black p-0">
+                            <EditableInput 
+                              value={item.note} 
+                              onChange={(v) => handleItemChange(item.id, 'note', v)}
+                              className="h-full px-2"
+                            />
+                          </td>
+                          <td className="border-0 p-0 text-center print:hidden align-middle">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 transition-all"
+                              onClick={() => removeItem(item.id)}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-gray-100">
+                        <td colSpan={6} className="border border-black p-2 text-center font-bold text-lg">합 계 (VAT 포함)</td>
+                        <td className="border border-black p-2 text-right font-bold text-lg">{data.total.toLocaleString()}</td>
+                        <td className="border border-black p-2"></td>
+                        <td className="border-0 print:hidden"></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={addItem}
+                    className="absolute -bottom-10 left-0 print:hidden"
+                  >
+                    <Plus className="w-4 h-4 mr-2" /> 품목 추가
+                  </Button>
+                </div>
+
+                <div className="border border-black p-4 text-sm space-y-2 mt-12">
+                  <div className="flex gap-4 items-center">
+                    <span className="font-bold w-24">납품 장소</span>
+                    <EditableInput 
+                      value={data.deliveryPlace} 
+                      onChange={(v) => setData({...data, deliveryPlace: v})}
+                    />
+                  </div>
+                  <div className="flex gap-4 items-center">
+                    <span className="font-bold w-24">검수 방법</span>
+                    <EditableInput 
+                      value={data.inspectionMethod} 
+                      onChange={(v) => setData({...data, inspectionMethod: v})}
+                    />
+                  </div>
+                  <div className="flex gap-4 items-center">
+                    <span className="font-bold w-24">결제 조건</span>
+                    <EditableInput 
+                      value={data.paymentTerms} 
+                      onChange={(v) => setData({...data, paymentTerms: v})}
+                    />
+                  </div>
+                  <div className="flex gap-4 items-start pt-2 border-t border-gray-200 mt-2">
+                    <span className="font-bold w-24 mt-1">특이사항</span>
+                    <EditableTextarea 
+                      value={data.remarks} 
+                      onChange={(v) => setData({...data, remarks: v})}
+                      rows={3}
+                      placeholder="특이사항 입력"
+                    />
+                  </div>
+                </div>
+                
+                <div className="mt-12 flex justify-end">
+                  <div className="text-center">
+                    <p className="mb-4 text-sm">위와 같이 발주합니다.</p>
+                    <div className="flex items-end gap-2">
+                      <span className="text-lg font-bold">발주 담당자 : </span>
+                      <span className="text-lg border-b border-black px-8 pb-1 w-40 inline-block"></span>
+                      <span className="text-sm">(인)</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </TabsContent>
-      </Tabs>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 }
