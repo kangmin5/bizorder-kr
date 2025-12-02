@@ -469,7 +469,7 @@ export function TransactionStatementPage() {
                   transformOrigin: 'top center',
                 }}
               >
-                {/* Header */}
+                {/* [Section] Title Header & Document Meta */}
                 <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-8">
                   <div className="w-1/2">
                     <h1 className="text-4xl font-bold tracking-widest mb-4">거 래 명 세 서</h1>
@@ -534,7 +534,7 @@ export function TransactionStatementPage() {
                   </div>
                 </div>
 
-                {/* Client Info */}
+                {/* [Section] Client Info */}
                 <div className="mb-8">
                   <div className="flex items-baseline gap-2 border-b border-black pb-2 mb-4">
                     <EditableInput 
@@ -566,7 +566,7 @@ export function TransactionStatementPage() {
                   <p className="text-sm text-gray-600">아래와 같이 거래합니다.</p>
                 </div>
 
-                {/* Items Table */}
+                {/* [Section] Line Items & Calculation */}
                 <div className="relative">
                   <table className="w-full border-collapse border border-black mb-8 text-sm">
                     <thead>
@@ -682,7 +682,7 @@ export function TransactionStatementPage() {
                   </Button>
                 </div>
 
-                {/* Footer Conditions */}
+                {/* [Section] Remarks & Terms */}
                 <div className="text-sm space-y-4 mt-auto pt-8">
                   <div className="flex gap-4 items-start pt-2">
                     <span className="font-bold w-20 text-gray-700 mt-1">비고</span>
@@ -696,6 +696,7 @@ export function TransactionStatementPage() {
                   </div>
                 </div>
 
+                {/* [Section] Footer & Signature */}
                 <div className="mt-12 text-center text-gray-400 text-xs">
                   Generatred by BizOrder
                 </div>

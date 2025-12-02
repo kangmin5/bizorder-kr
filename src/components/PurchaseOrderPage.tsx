@@ -474,11 +474,12 @@ export function PurchaseOrderPage() {
                   transformOrigin: 'top center',
                 }}
               >
-                {/* Header */}
+                {/* [Section] Title Header */}
                 <div className="text-center mb-8">
                   <h1 className="text-4xl font-bold tracking-[1em] underline decoration-double underline-offset-8">발 주 서</h1>
                 </div>
 
+                {/* [Section] Document Info (Meta, Supplier, Client) */}
                 <div className="flex justify-between mb-8 text-sm">
                   <div className="w-[45%]">
                     <table className="w-full border-collapse border border-black">
@@ -596,7 +597,7 @@ export function PurchaseOrderPage() {
                   <p className="text-sm">아래와 같이 발주하오니 기일 엄수하여 납품 바랍니다.</p>
                 </div>
 
-                {/* Items Table */}
+                {/* [Section] Line Items & Calculation */}
                 <div className="relative">
                   <table className="w-full border-collapse border border-black mb-6 text-sm">
                     <thead>
@@ -700,6 +701,7 @@ export function PurchaseOrderPage() {
                   </Button>
                 </div>
 
+                {/* [Section] Remarks & Terms */}
                 <div className="border border-black p-4 text-sm space-y-2 mt-12">
                   <div className="flex gap-4 items-center">
                     <span className="font-bold w-24">납품 장소</span>
@@ -733,6 +735,7 @@ export function PurchaseOrderPage() {
                   </div>
                 </div>
                 
+                {/* [Section] Footer & Signature */}
                 <div className="mt-12 flex justify-end">
                   <div className="text-center">
                     <p className="mb-4 text-sm">위와 같이 발주합니다.</p>

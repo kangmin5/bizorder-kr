@@ -488,7 +488,7 @@ export function QuotationPage() {
                   transformOrigin: 'top center',
                 }}
               >
-                {/* Document Header */}
+                {/* [Section] Document Header */}
                 <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-8">
                   <div className="w-1/2">
                     <h1 className="text-4xl font-bold tracking-widest mb-4">견 적 서</h1>
@@ -562,7 +562,7 @@ export function QuotationPage() {
                   </div>
                 </div>
 
-                {/* Client Info */}
+                {/* [Section] Client Info */}
                 <div className="mb-8">
                   <div className="flex items-baseline gap-2 border-b border-black pb-2 mb-4">
                     <EditableInput 
@@ -594,7 +594,7 @@ export function QuotationPage() {
                   <p className="text-sm text-gray-600">아래와 같이 견적합니다.</p>
                 </div>
 
-                {/* Items Table */}
+                {/* [Section] Line Items & Calculation */}
                 <div className="relative">
                   <table className="w-full border-collapse border border-black mb-8 text-sm">
                     <thead>
