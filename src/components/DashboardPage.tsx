@@ -9,6 +9,7 @@ import {
   ArrowDownRight,
   Plus
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { 
@@ -28,13 +29,8 @@ import {
 } from 'recharts';
 import { Badge } from './ui/badge';
 
-type Page = 'home' | 'quotation' | 'purchase-order' | 'transaction-statement' | 'subscription' | 'dashboard' | 'settings';
-
-interface DashboardPageProps {
-  onNavigate: (page: Page) => void;
-}
-
-export function DashboardPage({ onNavigate }: DashboardPageProps) {
+export function DashboardPage() {
+  const navigate = useNavigate();
   // Sample data
   const stats = [
     {
@@ -178,11 +174,11 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
           <p className="text-gray-600">비즈니스 현황을 한눈에 확인하세요</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" onClick={() => onNavigate('quotation')}>
+          <Button variant="outline" onClick={() => navigate('/quotation')}>
             <FileText className="w-4 h-4 mr-2" />
             견적서 작성
           </Button>
-          <Button onClick={() => onNavigate('purchase-order')}>
+          <Button onClick={() => navigate('/purchase-order')}>
             <Plus className="w-4 h-4 mr-2" />
             새 문서
           </Button>

@@ -480,36 +480,6 @@ export function QuotationPage() {
                   </div>
                 </CardContent>
               </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>공급자 정보 (내 정보)</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>상호</Label>
-                      <Input 
-                        value={data.supplier.name} 
-                        onChange={(e) => setData({...data, supplier: {...data.supplier, name: e.target.value}})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>등록번호</Label>
-                      <Input 
-                        value={data.supplier.registrationNumber} 
-                        onChange={(e) => setData({...data, supplier: {...data.supplier, registrationNumber: e.target.value}})}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>직인 이미지 업로드</Label>
-                    <div className="flex gap-2">
-                      <Input type="file" accept="image/*" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </div>
 
@@ -643,7 +613,7 @@ export function QuotationPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>특이사항 / 비고</Label>
+                <Label>특수조건 / 비고</Label>
                 <Textarea 
                   value={data.remarks} 
                   onChange={(e) => setData({...data, remarks: e.target.value})}

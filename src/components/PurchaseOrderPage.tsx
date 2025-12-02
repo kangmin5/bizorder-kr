@@ -407,22 +407,6 @@ export function PurchaseOrderPage() {
                   </div>
                 </CardContent>
               </Card>
-
-              <Card>
-                <CardHeader><CardTitle>발주자 정보 (내 정보)</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>상호</Label>
-                      <Input value={data.client.name} onChange={(e) => setData({...data, client: {...data.client, name: e.target.value}})} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>등록번호</Label>
-                      <Input value={data.client.registrationNumber} onChange={(e) => setData({...data, client: {...data.client, registrationNumber: e.target.value}})} />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </div>
 

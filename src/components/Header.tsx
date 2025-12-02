@@ -1,4 +1,5 @@
 import { FileText, User, CreditCard, LogOut, ChevronDown, LayoutDashboard, Settings } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { UserProfile } from '../utils/auth';
 import {
@@ -10,70 +11,73 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 
-type Page = 'home' | 'quotation' | 'purchase-order' | 'transaction-statement' | 'subscription' | 'dashboard' | 'settings';
-
 interface HeaderProps {
-  currentPage: Page;
-  onNavigate: (page: Page) => void;
   isAuthenticated: boolean;
   userProfile: UserProfile | null;
   onSignOut: () => void;
   onOpenAuth: () => void;
 }
 
-export function Header({ currentPage, onNavigate, isAuthenticated, userProfile, onSignOut, onOpenAuth }: HeaderProps) {
+export function Header({ isAuthenticated, userProfile, onSignOut, onOpenAuth }: HeaderProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const isActive = (path: string) => {
+    return location.pathname === path ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900';
+  };
+
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <div 
+          <Link 
+            to="/" 
             className="flex items-center gap-2 cursor-pointer"
-            onClick={() => onNavigate('home')}
           >
             <FileText className="w-8 h-8 text-blue-600" />
             <span className="text-blue-600">bizorder.kr</span>
-          </div>
+          </Link>
           
           <nav className="hidden md:flex items-center gap-6">
-            <button
-              onClick={() => onNavigate('home')}
-              className={currentPage === 'home' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}
+            <Link
+              to="/"
+              className={isActive('/')}
             >
               홈
-            </button>
+            </Link>
             {isAuthenticated && (
-              <button
-                onClick={() => onNavigate('dashboard')}
-                className={currentPage === 'dashboard' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}
+              <Link
+                to="/dashboard"
+                className={isActive('/dashboard')}
               >
                 대시보드
-              </button>
+              </Link>
             )}
-            <button
-              onClick={() => onNavigate('quotation')}
-              className={currentPage === 'quotation' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}
+            <Link
+              to="/quotation"
+              className={isActive('/quotation')}
             >
               견적서
-            </button>
-            <button
-              onClick={() => onNavigate('purchase-order')}
-              className={currentPage === 'purchase-order' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}
+            </Link>
+            <Link
+              to="/purchase-order"
+              className={isActive('/purchase-order')}
             >
               발주서
-            </button>
-            <button
-              onClick={() => onNavigate('transaction-statement')}
-              className={currentPage === 'transaction-statement' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}
+            </Link>
+            <Link
+              to="/transaction-statement"
+              className={isActive('/transaction-statement')}
             >
               거래명세서
-            </button>
+            </Link>
             {isAuthenticated && (
-              <button
-                onClick={() => onNavigate('settings')}
-                className={currentPage === 'settings' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}
+              <Link
+                to="/settings"
+                className={isActive('/settings')}
               >
                 설정
-              </button>
+              </Link>
             )}
           </nav>
 
@@ -95,15 +99,15 @@ export function Header({ currentPage, onNavigate, isAuthenticated, userProfile, 
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onNavigate('dashboard')}>
+                  <DropdownMenuItem onClick={() => navigate('/dashboard')}>
                     <LayoutDashboard className="w-4 h-4 mr-2" />
                     대시보드
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onNavigate('subscription')}>
+                  <DropdownMenuItem onClick={() => navigate('/subscription')}>
                     <CreditCard className="w-4 h-4 mr-2" />
                     구독 관리
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onNavigate('settings')}>
+                  <DropdownMenuItem onClick={() => navigate('/settings')}>
                     <Settings className="w-4 h-4 mr-2" />
                     설정
                   </DropdownMenuItem>

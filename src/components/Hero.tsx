@@ -1,14 +1,10 @@
 import { FileText, FileCheck, Receipt, Clock, CheckCircle, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 
-type Page = 'home' | 'quotation' | 'purchase-order' | 'transaction-statement' | 'subscription';
-
-interface HeroProps {
-  onNavigate: (page: Page) => void;
-}
-
-export function Hero({ onNavigate }: HeroProps) {
+export function Hero() {
+  const navigate = useNavigate();
   const documents = [
     {
       id: 'quotation' as const,
@@ -93,7 +89,7 @@ export function Hero({ onNavigate }: HeroProps) {
                 <Card
                   key={doc.id}
                   className="cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1"
-                  onClick={() => onNavigate(doc.id)}
+                  onClick={() => navigate('/' + doc.id)}
                 >
                   <CardContent className="p-6">
                     <div className={`${doc.color} w-12 h-12 rounded-lg flex items-center justify-center mb-4`}>
