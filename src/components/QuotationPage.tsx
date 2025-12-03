@@ -73,7 +73,7 @@ type Orientation = 'portrait' | 'landscape';
 type Theme = 'classic' | 'modern' | 'minimal' | 'bold' | 'blue' | 'dark';
 type FontFamily = 'nanum-gothic' | 'nanum-myeongjo' | 'system';
 
-type Currency = '원' | '천원' | 'US달러';
+type Currency = '원' | '천원' | 'USD';
 
 type PageSettings = {
   paperSize: PaperSize;
@@ -741,7 +741,7 @@ export function QuotationPage() {
                       <SelectContent>
                         <SelectItem value="원">원 (KRW)</SelectItem>
                         <SelectItem value="천원">천원</SelectItem>
-                        <SelectItem value="US달러">US달러 (USD)</SelectItem>
+                        <SelectItem value="USD">USD</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
