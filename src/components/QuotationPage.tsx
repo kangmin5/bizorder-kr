@@ -200,6 +200,13 @@ export function QuotationPage() {
     margins: 10,
   });
 
+  // 숫자 계산 설정
+  const [calcSettings, setCalcSettings] = useState({
+    priceDecimalPlaces: 0 as 0 | 1 | 2,  // 단가 소수점 자리: 0, 1, 2
+    priceRounding: 'round' as 'round' | 'floor' | 'ceil',  // 단가 반올림 방식
+    vatRounding: 'round' as 'round' | 'floor' | 'ceil',  // 부가세 반올림 방식
+  });
+
   // 컬럼 너비 상태 (퍼센트)
   const [colWidths, setColWidths] = useState({
     no: 4,
@@ -278,14 +285,20 @@ export function QuotationPage() {
 
   useEffect(() => {
     calculateTotals();
-  }, [data.items, data.vatIncluded]);
+  }, [data.items, data.vatIncluded, calcSettings.vatRounding]);
 
   const handleItemChange = (id: string, field: keyof LineItem, value: any) => {
     const newItems = data.items.map(item => {
       if (item.id === id) {
-        const updatedItem = { ...item, [field]: value };
+        let newValue = value;
+        // 단가에 반올림 적용
+        if (field === 'unitPrice' && typeof value === 'number') {
+          newValue = applyRounding(value, calcSettings.priceRounding, calcSettings.priceDecimalPlaces);
+        }
+        const updatedItem = { ...item, [field]: newValue };
         if (field === 'quantity' || field === 'unitPrice') {
-          updatedItem.amount = updatedItem.quantity * updatedItem.unitPrice;
+          // 금액 계산 (정수로 반올림)
+          updatedItem.amount = Math.round(updatedItem.quantity * updatedItem.unitPrice);
         }
         return updatedItem;
       }
@@ -320,22 +333,35 @@ export function QuotationPage() {
     return `${numbers.slice(0, 3)}-${numbers.slice(3, 5)}-${numbers.slice(5)}`;
   };
 
-  // 숫자 포맷팅 (3자리 콤마)
-  const formatNumber = (value: string | number): string => {
-    const num = typeof value === 'string' ? value.replace(/[^0-9]/g, '') : String(value);
-    if (!num) return '';
-    return Number(num).toLocaleString();
+  // 숫자 포맷팅 (3자리 콤마, 소수점 지원)
+  const formatNumber = (value: string | number, decimalPlaces?: number): string => {
+    const num = typeof value === 'number' ? value : parseFloat(value.replace(/[^0-9.]/g, ''));
+    if (isNaN(num)) return '';
+    const dp = decimalPlaces ?? 0;
+    return num.toLocaleString('ko-KR', { minimumFractionDigits: dp, maximumFractionDigits: dp });
   };
 
-  // 포맷된 문자열에서 숫자 추출
-  const parseNumber = (value: string): number => {
-    const num = value.replace(/[^0-9]/g, '');
-    return num ? Number(num) : 0;
+  // 포맷된 문자열에서 숫자 추출 (소수점 지원)
+  const parseNumber = (value: string, allowDecimal: boolean = false): number => {
+    const pattern = allowDecimal ? /[^0-9.]/g : /[^0-9]/g;
+    const num = value.replace(pattern, '');
+    return num ? parseFloat(num) : 0;
+  };
+
+  // 반올림 함수
+  const applyRounding = (value: number, method: 'round' | 'floor' | 'ceil', decimalPlaces: number = 0) => {
+    const multiplier = Math.pow(10, decimalPlaces);
+    switch (method) {
+      case 'floor': return Math.floor(value * multiplier) / multiplier;
+      case 'ceil': return Math.ceil(value * multiplier) / multiplier;
+      default: return Math.round(value * multiplier) / multiplier;
+    }
   };
 
   const calculateTotals = () => {
     const subtotal = data.items.reduce((sum, item) => sum + item.amount, 0);
-    const vat = data.vatIncluded ? 0 : subtotal * 0.1;
+    const rawVat = data.vatIncluded ? 0 : subtotal * 0.1;
+    const vat = applyRounding(rawVat, calcSettings.vatRounding, 0);
     const total = subtotal + vat;
     setData(prev => ({ ...prev, subtotal, vat, total }));
   };
@@ -630,6 +656,56 @@ export function QuotationPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">숫자 계산 설정</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-gray-600">단가 소수점 자리</Label>
+                    <Select 
+                      value={String(calcSettings.priceDecimalPlaces)} 
+                      onValueChange={(v) => setCalcSettings({...calcSettings, priceDecimalPlaces: Number(v) as 0 | 1 | 2})}
+                    >
+                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">정수 (소수점 없음)</SelectItem>
+                        <SelectItem value="1">소수점 1자리</SelectItem>
+                        <SelectItem value="2">소수점 2자리</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-gray-600">단가 반올림 방식</Label>
+                    <Select 
+                      value={calcSettings.priceRounding} 
+                      onValueChange={(v: 'round' | 'floor' | 'ceil') => setCalcSettings({...calcSettings, priceRounding: v})}
+                    >
+                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="round">반올림</SelectItem>
+                        <SelectItem value="floor">내림 (버림)</SelectItem>
+                        <SelectItem value="ceil">올림</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-gray-600">부가세 반올림 방식</Label>
+                    <Select 
+                      value={calcSettings.vatRounding} 
+                      onValueChange={(v: 'round' | 'floor' | 'ceil') => setCalcSettings({...calcSettings, vatRounding: v})}
+                    >
+                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="round">반올림</SelectItem>
+                        <SelectItem value="floor">내림 (버림)</SelectItem>
+                        <SelectItem value="ceil">올림</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </ResizablePanel>
@@ -891,8 +967,8 @@ export function QuotationPage() {
                                 </td>
                                 <td className="border border-black p-0">
                                   <EditableInput 
-                                    value={formatNumber(item.unitPrice)} 
-                                    onChange={(v) => handleItemChange(item.id, 'unitPrice', parseNumber(v))}
+                                    value={formatNumber(item.unitPrice, calcSettings.priceDecimalPlaces)} 
+                                    onChange={(v) => handleItemChange(item.id, 'unitPrice', parseNumber(v, calcSettings.priceDecimalPlaces > 0))}
                                     align="right"
                                     className="h-full px-2"
                                   />
