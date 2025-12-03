@@ -299,7 +299,16 @@ export function QuotationPage() {
     setData({ ...data, items: [...data.items, newItem] });
   };
 
+  // 특정 인덱스 뒤에 항목 삽입
+  const insertItemAfter = (index: number) => {
+    const newItem = { ...INITIAL_ITEM, id: Math.random().toString(36).substr(2, 9) };
+    const newItems = [...data.items];
+    newItems.splice(index + 1, 0, newItem);
+    setData({ ...data, items: newItems });
+  };
+
   const removeItem = (id: string) => {
+    if (data.items.length <= 1) return; // 최소 1개 항목 유지
     setData({ ...data, items: data.items.filter(item => item.id !== id) });
   };
 
@@ -309,6 +318,19 @@ export function QuotationPage() {
     if (numbers.length <= 3) return numbers;
     if (numbers.length <= 5) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
     return `${numbers.slice(0, 3)}-${numbers.slice(3, 5)}-${numbers.slice(5)}`;
+  };
+
+  // 숫자 포맷팅 (3자리 콤마)
+  const formatNumber = (value: string | number): string => {
+    const num = typeof value === 'string' ? value.replace(/[^0-9]/g, '') : String(value);
+    if (!num) return '';
+    return Number(num).toLocaleString();
+  };
+
+  // 포맷된 문자열에서 숫자 추출
+  const parseNumber = (value: string): number => {
+    const num = value.replace(/[^0-9]/g, '');
+    return num ? Number(num) : 0;
   };
 
   const calculateTotals = () => {
@@ -619,21 +641,21 @@ export function QuotationPage() {
           <div className="h-full overflow-auto">
             <div className="flex flex-col items-center p-8 min-w-[800px] gap-8" ref={printRef}>
               {pages.map((page, pageIndex) => (
-                <div 
-                  key={pageIndex}
-                  id={`page-${pageIndex}`}
-                  className={cn(
-                    "shadow-lg transition-all duration-300 p-[10mm] box-border relative bg-white flex flex-col page-break overflow-hidden",
-                    renderThemeStyles()
-                  )}
-                  style={{
-                    width: `${getPaperDimensions().width}mm`,
-                    height: `${getPaperDimensions().height}mm`,
-                    transform: `scale(${zoom / 100})`,
-                    transformOrigin: 'top center',
-                    marginBottom: '2rem',
-                  }}
-                >
+                <div key={pageIndex} className="flex items-start gap-2" style={{ marginBottom: '2rem' }}>
+                  {/* 문서 페이지 */}
+                  <div 
+                    id={`page-${pageIndex}`}
+                    className={cn(
+                      "shadow-lg transition-all duration-300 p-[10mm] box-border relative bg-white flex flex-col page-break",
+                      renderThemeStyles()
+                    )}
+                    style={{
+                      width: `${getPaperDimensions().width}mm`,
+                      height: `${getPaperDimensions().height}mm`,
+                      transform: `scale(${zoom / 100})`,
+                      transformOrigin: 'top center',
+                    }}
+                  >
                   {/* [Section] Document Header - 콤팩트 레이아웃 */}
                   {page.isFirst && (
                     <>
@@ -746,180 +768,172 @@ export function QuotationPage() {
                   )}
 
                   {/* [Section] Line Items & Calculation */}
-                  {/* 컬럼 너비 드래그로 조절 가능 */}
-                  <div className="relative overflow-y-hidden">
+                  {/* 컬럼 너비 드래그로 조절 가능, 삭제/추가 버튼은 테이블 밖에 표시 */}
+                  <div className="relative overflow-visible">
+                    {/* 메인 테이블 - 100% 너비 */}
                     <table className="w-full border-collapse border border-black mb-2 text-sm table-fixed">
-                      <colgroup>
-                        <col style={{ width: `${colWidths.no}%` }} />
-                        <col style={{ width: `${colWidths.name}%` }} />
-                        <col style={{ width: `${colWidths.spec}%` }} />
-                        <col style={{ width: `${colWidths.unit}%` }} />
-                        <col style={{ width: `${colWidths.qty}%` }} />
-                        <col style={{ width: `${colWidths.price}%` }} />
-                        <col style={{ width: `${colWidths.amount}%` }} />
-                        <col style={{ width: `${colWidths.note}%` }} />
-                        <col className="print:hidden" style={{ width: '24px' }} />
-                      </colgroup>
-                      <thead>
-                        <tr className="bg-gray-100">
-                          <th className="border border-black p-1.5 text-center relative">
-                            No
-                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                              onMouseDown={(e) => handleColumnResize('no', e.clientX, colWidths.no)} />
-                          </th>
-                          <th className="border border-black p-1.5 relative">
-                            품명
-                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                              onMouseDown={(e) => handleColumnResize('name', e.clientX, colWidths.name)} />
-                          </th>
-                          <th className="border border-black p-1.5 relative">
-                            규격
-                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                              onMouseDown={(e) => handleColumnResize('spec', e.clientX, colWidths.spec)} />
-                          </th>
-                          <th className="border border-black p-1.5 text-center relative">
-                            단위
-                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                              onMouseDown={(e) => handleColumnResize('unit', e.clientX, colWidths.unit)} />
-                          </th>
-                          <th className="border border-black p-1.5 text-center relative">
-                            수량
-                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                              onMouseDown={(e) => handleColumnResize('qty', e.clientX, colWidths.qty)} />
-                          </th>
-                          <th className="border border-black p-1.5 text-center relative">
-                            단가
-                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                              onMouseDown={(e) => handleColumnResize('price', e.clientX, colWidths.price)} />
-                          </th>
-                          <th className="border border-black p-1.5 text-center relative">
-                            공급가액
-                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                              onMouseDown={(e) => handleColumnResize('amount', e.clientX, colWidths.amount)} />
-                          </th>
-                          <th className="border border-black p-1.5">비고</th>
-                          <th className="border-0 p-0 print:hidden bg-white" data-html2canvas-ignore></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {page.items.map((row) => {
-                          if (row.type === 'subtotal') {
-                            return (
-                              <tr key="subtotal" className="bg-gray-50">
-                                <td colSpan={6} className="border border-black p-2 text-center font-bold">소 계</td>
-                                <td className="border border-black p-2 text-right font-bold">{data.subtotal.toLocaleString()}</td>
-                                <td className="border border-black p-2"></td>
-                                <td className="border-0 print:hidden" data-html2canvas-ignore></td>
-                              </tr>
-                            );
-                          }
-                          if (row.type === 'vat') {
-                            return (
-                              <tr key="vat" className="bg-gray-50">
-                                <td colSpan={6} className="border border-black p-2 text-center font-bold">부 가 세</td>
-                                <td className="border border-black p-2 text-right font-bold">{data.vat.toLocaleString()}</td>
-                                <td className="border border-black p-2"></td>
-                                <td className="border-0 print:hidden" data-html2canvas-ignore></td>
-                              </tr>
-                            );
-                          }
-                          if (row.type === 'total') {
-                            return (
-                              <tr key="total" className="bg-gray-100">
-                                <td colSpan={6} className="border border-black p-2 text-center font-bold text-lg">총 합 계</td>
-                                <td className="border border-black p-2 text-right font-bold text-lg text-blue-600">{data.total.toLocaleString()}</td>
-                                <td className="border border-black p-2"></td>
-                                <td className="border-0 print:hidden" data-html2canvas-ignore></td>
-                              </tr>
-                            );
-                          }
-                          
-                          const item = row.data!;
-                          const itemIndex = data.items.findIndex(i => i.id === item.id);
-                          
-                          return (
-                          <tr key={item.id} className="group hover:bg-blue-50/30">
-                            <td className="border border-black p-1 text-center bg-gray-50">
-                              {itemIndex + 1}
-                            </td>
-                            <td className="border border-black p-0">
-                              <EditableInput 
-                                value={item.name} 
-                                onChange={(v) => handleItemChange(item.id, 'name', v)}
-                                className="h-full px-2"
-                              />
-                            </td>
-                            <td className="border border-black p-0">
-                              <EditableInput 
-                                value={item.spec} 
-                                onChange={(v) => handleItemChange(item.id, 'spec', v)}
-                                align="center"
-                                className="h-full px-1"
-                              />
-                            </td>
-                            <td className="border border-black p-0">
-                              <EditableInput 
-                                value={item.unit} 
-                                onChange={(v) => handleItemChange(item.id, 'unit', v)}
-                                align="center"
-                                className="h-full px-1"
-                              />
-                            </td>
-                            <td className="border border-black p-0">
-                              <EditableInput 
-                                type="number"
-                                value={item.quantity} 
-                                onChange={(v) => handleItemChange(item.id, 'quantity', Number(v))}
-                                align="right"
-                                className="h-full px-2"
-                              />
-                            </td>
-                            <td className="border border-black p-0">
-                              <EditableInput 
-                                type="number"
-                                value={item.unitPrice} 
-                                onChange={(v) => handleItemChange(item.id, 'unitPrice', Number(v))}
-                                align="right"
-                                className="h-full px-2"
-                              />
-                            </td>
-                            <td className="border border-black p-1 text-right font-medium bg-gray-50/50">
-                              {item.amount.toLocaleString()}
-                            </td>
-                            <td className="border border-black p-0">
-                              <EditableInput 
-                                value={item.note} 
-                                onChange={(v) => handleItemChange(item.id, 'note', v)}
-                                className="h-full px-2"
-                              />
-                            </td>
-                            <td className="border-0 p-0 text-center print:hidden align-middle" data-html2canvas-ignore>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 transition-all"
-                                onClick={() => removeItem(item.id)}
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </td>
+                        <colgroup>
+                          <col style={{ width: `${colWidths.no}%` }} />
+                          <col style={{ width: `${colWidths.name}%` }} />
+                          <col style={{ width: `${colWidths.spec}%` }} />
+                          <col style={{ width: `${colWidths.unit}%` }} />
+                          <col style={{ width: `${colWidths.qty}%` }} />
+                          <col style={{ width: `${colWidths.price}%` }} />
+                          <col style={{ width: `${colWidths.amount}%` }} />
+                          <col style={{ width: `${colWidths.note}%` }} />
+                        </colgroup>
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="border border-black p-1.5 text-center relative">
+                              No
+                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                                onMouseDown={(e) => handleColumnResize('no', e.clientX, colWidths.no)} />
+                            </th>
+                            <th className="border border-black p-1.5 text-center relative">
+                              품명
+                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                                onMouseDown={(e) => handleColumnResize('name', e.clientX, colWidths.name)} />
+                            </th>
+                            <th className="border border-black p-1.5 text-center relative">
+                              규격
+                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                                onMouseDown={(e) => handleColumnResize('spec', e.clientX, colWidths.spec)} />
+                            </th>
+                            <th className="border border-black p-1.5 text-center relative">
+                              단위
+                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                                onMouseDown={(e) => handleColumnResize('unit', e.clientX, colWidths.unit)} />
+                            </th>
+                            <th className="border border-black p-1.5 text-center relative">
+                              수량
+                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                                onMouseDown={(e) => handleColumnResize('qty', e.clientX, colWidths.qty)} />
+                            </th>
+                            <th className="border border-black p-1.5 text-center relative">
+                              단가
+                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                                onMouseDown={(e) => handleColumnResize('price', e.clientX, colWidths.price)} />
+                            </th>
+                            <th className="border border-black p-1.5 text-center relative">
+                              공급가액
+                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                                onMouseDown={(e) => handleColumnResize('amount', e.clientX, colWidths.amount)} />
+                            </th>
+                            <th className="border border-black p-1.5 text-center">비고</th>
                           </tr>
-                          );
-                        })}
-                      </tbody>
+                        </thead>
+                        <tbody>
+                          {page.items.map((row) => {
+                            if (row.type === 'subtotal') {
+                              return (
+                                <tr key="subtotal" className="bg-gray-50">
+                                  <td colSpan={6} className="border border-black p-2 text-center font-bold">소 계</td>
+                                  <td colSpan={2} className="border border-black p-2 text-right font-bold">{data.subtotal.toLocaleString()}</td>
+                                </tr>
+                              );
+                            }
+                            if (row.type === 'vat') {
+                              return (
+                                <tr key="vat" className="bg-gray-50">
+                                  <td colSpan={6} className="border border-black p-2 text-center font-bold">부 가 세</td>
+                                  <td colSpan={2} className="border border-black p-2 text-right font-bold">{data.vat.toLocaleString()}</td>
+                                </tr>
+                              );
+                            }
+                            if (row.type === 'total') {
+                              return (
+                                <tr key="total" className="bg-gray-100">
+                                  <td colSpan={6} className="border border-black p-2 text-center font-bold text-lg">총 합 계</td>
+                                  <td colSpan={2} className="border border-black p-2 text-right font-bold text-lg text-blue-600">{data.total.toLocaleString()}</td>
+                                </tr>
+                              );
+                            }
+                            
+                            const item = row.data!;
+                            const itemIndex = data.items.findIndex(i => i.id === item.id);
+                            
+                            return (
+                              <tr key={item.id} className="group hover:bg-blue-50/30 relative">
+                                <td className="border border-black p-1 text-center bg-gray-50">
+                                  {itemIndex + 1}
+                                </td>
+                                <td className="border border-black p-0">
+                                  <EditableInput 
+                                    value={item.name} 
+                                    onChange={(v) => handleItemChange(item.id, 'name', v)}
+                                    align="left"
+                                    className="h-full px-2"
+                                  />
+                                </td>
+                                <td className="border border-black p-0">
+                                  <EditableInput 
+                                    value={item.spec} 
+                                    onChange={(v) => handleItemChange(item.id, 'spec', v)}
+                                    align="left"
+                                    className="h-full px-1"
+                                  />
+                                </td>
+                                <td className="border border-black p-0">
+                                  <EditableInput 
+                                    value={item.unit} 
+                                    onChange={(v) => handleItemChange(item.id, 'unit', v)}
+                                    align="center"
+                                    className="h-full px-1"
+                                  />
+                                </td>
+                                <td className="border border-black p-0">
+                                  <EditableInput 
+                                    value={formatNumber(item.quantity)} 
+                                    onChange={(v) => handleItemChange(item.id, 'quantity', parseNumber(v))}
+                                    align="center"
+                                    className="h-full px-2"
+                                  />
+                                </td>
+                                <td className="border border-black p-0">
+                                  <EditableInput 
+                                    value={formatNumber(item.unitPrice)} 
+                                    onChange={(v) => handleItemChange(item.id, 'unitPrice', parseNumber(v))}
+                                    align="right"
+                                    className="h-full px-2"
+                                  />
+                                </td>
+                                <td className="border border-black p-1 text-right font-medium bg-gray-50/50">
+                                  {item.amount.toLocaleString()}
+                                </td>
+                                <td className="border border-black p-0 relative">
+                                  <EditableInput 
+                                    value={item.note} 
+                                    onChange={(v) => handleItemChange(item.id, 'note', v)}
+                                    align="center"
+                                    className="h-full px-2"
+                                  />
+                                  {/* 행 hover 시 나타나는 액션 버튼 */}
+                                  <div className="absolute left-full top-0 bottom-0 flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity print:hidden" data-html2canvas-ignore>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                                      onClick={() => insertItemAfter(itemIndex)}
+                                      title="아래에 항목 추가"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                      onClick={() => removeItem(item.id)}
+                                      title="항목 삭제"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
                     </table>
-                    
-                    {page.showButton && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={addItem}
-                        className="print:hidden mb-4 w-full border-dashed border-2 hover:bg-gray-50 text-gray-600"
-                        data-html2canvas-ignore
-                      >
-                        <Plus className="w-4 h-4 mr-2" /> 품목 추가
-                      </Button>
-                    )}
                   </div>
 
                   {/* [Section] Remarks & Terms (Last Page Only) */}
@@ -948,6 +962,7 @@ export function QuotationPage() {
                       {settings.showPageNumbers && <div className="text-xs mt-1">{pageIndex + 1} / {pages.length}</div>}
                     </div>
                   )}
+                  </div>
                 </div>
               ))}
             </div>
