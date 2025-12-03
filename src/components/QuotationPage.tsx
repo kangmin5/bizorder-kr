@@ -148,6 +148,74 @@ const EditableInput = ({
   />
 );
 
+// 숫자 입력용 컴포넌트 - blur 시에만 포맷팅 적용
+const NumberInput = ({ 
+  value, 
+  onChange, 
+  className, 
+  decimalPlaces = 0,
+  align = "right" 
+}: { 
+  value: number; 
+  onChange: (val: number) => void; 
+  className?: string;
+  decimalPlaces?: number;
+  align?: "left" | "center" | "right";
+}) => {
+  const [localValue, setLocalValue] = useState(String(value));
+  const [isFocused, setIsFocused] = useState(false);
+
+  // 외부 value가 변경되고 포커스가 없을 때만 로컬 값 업데이트
+  useEffect(() => {
+    if (!isFocused) {
+      const formatted = value.toLocaleString('ko-KR', { 
+        minimumFractionDigits: decimalPlaces, 
+        maximumFractionDigits: decimalPlaces 
+      });
+      setLocalValue(formatted);
+    }
+  }, [value, decimalPlaces, isFocused]);
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    // 포커스 시 콤마 제거하고 순수 숫자만 표시
+    setLocalValue(String(value));
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    // blur 시 숫자로 변환하여 onChange 호출
+    const num = localValue.replace(/[^0-9.]/g, '');
+    const parsed = num ? parseFloat(num) : 0;
+    onChange(parsed);
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // 숫자와 소수점만 허용
+    const filtered = e.target.value.replace(/[^0-9.]/g, '');
+    // 소수점이 두 개 이상이면 첫 번째만 유지
+    const parts = filtered.split('.');
+    const sanitized = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : filtered;
+    setLocalValue(sanitized);
+  };
+
+  return (
+    <input
+      type="text"
+      value={localValue}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      className={cn(
+        "bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-0.5 w-full transition-colors",
+        align === "center" && "text-center",
+        align === "right" && "text-right",
+        className
+      )}
+    />
+  );
+};
+
 const EditableTextarea = ({ 
   value, 
   onChange, 
@@ -311,11 +379,6 @@ export function QuotationPage() {
       return item;
     });
     setData({ ...data, items: newItems });
-  };
-
-  const addItem = () => {
-    const newItem = { ...INITIAL_ITEM, id: Math.random().toString(36).substr(2, 9) };
-    setData({ ...data, items: [...data.items, newItem] });
   };
 
   // 특정 인덱스 뒤에 항목 삽입
@@ -1001,9 +1064,10 @@ export function QuotationPage() {
                                   />
                                 </td>
                                 <td className="border border-black p-0">
-                                  <EditableInput 
-                                    value={formatNumber(item.unitPrice, calcSettings.priceDecimalPlaces)} 
-                                    onChange={(v) => handleItemChange(item.id, 'unitPrice', parseNumber(v, calcSettings.priceDecimalPlaces > 0))}
+                                  <NumberInput 
+                                    value={item.unitPrice} 
+                                    onChange={(v) => handleItemChange(item.id, 'unitPrice', v)}
+                                    decimalPlaces={calcSettings.priceDecimalPlaces}
                                     align="right"
                                     className="h-full px-2"
                                   />
