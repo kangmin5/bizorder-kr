@@ -200,6 +200,39 @@ export function QuotationPage() {
     margins: 10,
   });
 
+  // 컬럼 너비 상태 (퍼센트)
+  const [colWidths, setColWidths] = useState({
+    no: 4,
+    name: 34,
+    spec: 13,
+    unit: 6,
+    qty: 8,
+    price: 12,
+    amount: 13,
+    note: 10,
+  });
+
+  // 컬럼 리사이즈 핸들러
+  const handleColumnResize = (column: keyof typeof colWidths, startX: number, startWidth: number) => {
+    const onMouseMove = (e: MouseEvent) => {
+      const tableWidth = 680; // 대략적인 테이블 픽셀 너비
+      const deltaX = e.clientX - startX;
+      const deltaPercent = (deltaX / tableWidth) * 100;
+      const newWidth = Math.max(2, Math.min(50, startWidth + deltaPercent));
+      setColWidths(prev => ({ ...prev, [column]: newWidth }));
+    };
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
   const [data, setData] = useState<QuotationData>(() => ({
     quotationNumber: `QT-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-001`,
     date: new Date().toISOString().split('T')[0],
@@ -713,19 +746,59 @@ export function QuotationPage() {
                   )}
 
                   {/* [Section] Line Items & Calculation */}
+                  {/* 컬럼 너비 드래그로 조절 가능 */}
                   <div className="relative overflow-y-hidden">
-                    <table className="w-full border-collapse border border-black mb-2 text-sm">
+                    <table className="w-full border-collapse border border-black mb-2 text-sm table-fixed">
+                      <colgroup>
+                        <col style={{ width: `${colWidths.no}%` }} />
+                        <col style={{ width: `${colWidths.name}%` }} />
+                        <col style={{ width: `${colWidths.spec}%` }} />
+                        <col style={{ width: `${colWidths.unit}%` }} />
+                        <col style={{ width: `${colWidths.qty}%` }} />
+                        <col style={{ width: `${colWidths.price}%` }} />
+                        <col style={{ width: `${colWidths.amount}%` }} />
+                        <col style={{ width: `${colWidths.note}%` }} />
+                        <col className="print:hidden" style={{ width: '24px' }} />
+                      </colgroup>
                       <thead>
                         <tr className="bg-gray-100">
-                          <th className="border border-black p-2 w-12">No</th>
-                          <th className="border border-black p-2">품명</th>
-                          <th className="border border-black p-2 w-20">규격</th>
-                          <th className="border border-black p-2 w-16">단위</th>
-                          <th className="border border-black p-2 w-20">수량</th>
-                          <th className="border border-black p-2 w-28">단가</th>
-                          <th className="border border-black p-2 w-32">공급가액</th>
-                          <th className="border border-black p-2 w-24">비고</th>
-                          <th className="border border-black p-1 w-8 print:hidden bg-white border-l-0" data-html2canvas-ignore></th>
+                          <th className="border border-black p-1.5 text-center relative">
+                            No
+                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                              onMouseDown={(e) => handleColumnResize('no', e.clientX, colWidths.no)} />
+                          </th>
+                          <th className="border border-black p-1.5 relative">
+                            품명
+                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                              onMouseDown={(e) => handleColumnResize('name', e.clientX, colWidths.name)} />
+                          </th>
+                          <th className="border border-black p-1.5 relative">
+                            규격
+                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                              onMouseDown={(e) => handleColumnResize('spec', e.clientX, colWidths.spec)} />
+                          </th>
+                          <th className="border border-black p-1.5 text-center relative">
+                            단위
+                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                              onMouseDown={(e) => handleColumnResize('unit', e.clientX, colWidths.unit)} />
+                          </th>
+                          <th className="border border-black p-1.5 text-center relative">
+                            수량
+                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                              onMouseDown={(e) => handleColumnResize('qty', e.clientX, colWidths.qty)} />
+                          </th>
+                          <th className="border border-black p-1.5 text-center relative">
+                            단가
+                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                              onMouseDown={(e) => handleColumnResize('price', e.clientX, colWidths.price)} />
+                          </th>
+                          <th className="border border-black p-1.5 text-center relative">
+                            공급가액
+                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                              onMouseDown={(e) => handleColumnResize('amount', e.clientX, colWidths.amount)} />
+                          </th>
+                          <th className="border border-black p-1.5">비고</th>
+                          <th className="border-0 p-0 print:hidden bg-white" data-html2canvas-ignore></th>
                         </tr>
                       </thead>
                       <tbody>
