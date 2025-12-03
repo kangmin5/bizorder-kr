@@ -73,12 +73,16 @@ type Orientation = 'portrait' | 'landscape';
 type Theme = 'classic' | 'modern' | 'minimal' | 'bold' | 'blue' | 'dark';
 type FontFamily = 'nanum-gothic' | 'nanum-myeongjo' | 'system';
 
+type Currency = '원' | '천원' | 'US달러';
+
 type PageSettings = {
   paperSize: PaperSize;
   orientation: Orientation;
   theme: Theme;
   fontFamily: FontFamily;
   showPageNumbers: boolean;
+  showSpecialTerms: boolean;  // 특수조건 표시 여부
+  currency: Currency;  // 통화 단위
   margins: number; // mm
 }
 
@@ -197,6 +201,8 @@ export function QuotationPage() {
     theme: 'classic',
     fontFamily: 'nanum-gothic',
     showPageNumbers: true,
+    showSpecialTerms: true,
+    currency: '원',
     margins: 10,
   });
 
@@ -641,10 +647,10 @@ export function QuotationPage() {
                   <div className="flex items-center space-x-2">
                     <Checkbox 
                       id="vat" 
-                      checked={data.vatIncluded}
-                      onCheckedChange={(c) => setData({...data, vatIncluded: !!c})}
+                      checked={!data.vatIncluded}
+                      onCheckedChange={(c) => setData({...data, vatIncluded: !c})}
                     />
-                    <Label htmlFor="vat">부가세 포함 단가 적용</Label>
+                    <Label htmlFor="vat">부가세 별도 단가 적용</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Checkbox 
@@ -653,6 +659,28 @@ export function QuotationPage() {
                       onCheckedChange={(c) => setSettings({...settings, showPageNumbers: !!c})}
                     />
                     <Label htmlFor="page-num">페이지 번호 표시</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="special-terms" 
+                      checked={settings.showSpecialTerms}
+                      onCheckedChange={(c) => setSettings({...settings, showSpecialTerms: !!c})}
+                    />
+                    <Label htmlFor="special-terms">특수조건 표시</Label>
+                  </div>
+                  <div className="space-y-2 pt-2">
+                    <Label className="text-xs text-gray-600">통화 단위</Label>
+                    <Select 
+                      value={settings.currency} 
+                      onValueChange={(v: Currency) => setSettings({...settings, currency: v})}
+                    >
+                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="원">원 (KRW)</SelectItem>
+                        <SelectItem value="천원">천원</SelectItem>
+                        <SelectItem value="US달러">US달러 (USD)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </CardContent>
               </Card>
@@ -754,7 +782,7 @@ export function QuotationPage() {
                           )}
                         </div>
                         <p className="text-xl font-bold text-red-600">
-                          {data.total.toLocaleString()} 원 <span className="text-sm text-black font-normal">(VAT 포함)</span>
+                          {data.total.toLocaleString()} {settings.currency} <span className="text-sm text-black font-normal">(VAT 포함)</span>
                         </p>
                       </div>
 
@@ -846,6 +874,10 @@ export function QuotationPage() {
                   {/* [Section] Line Items & Calculation */}
                   {/* 컬럼 너비 드래그로 조절 가능, 삭제/추가 버튼은 테이블 밖에 표시 */}
                   <div className="relative overflow-visible">
+                    {/* 통화 단위 표시 - 테이블 우측 상단 */}
+                    {page.isFirst && (
+                      <div className="text-right text-xs text-gray-500 mb-1">(단위: {settings.currency})</div>
+                    )}
                     {/* 메인 테이블 - 100% 너비 */}
                     <table className="w-full border-collapse border border-black mb-2 text-sm table-fixed">
                         <colgroup>
@@ -858,53 +890,56 @@ export function QuotationPage() {
                           <col style={{ width: `${colWidths.amount}%` }} />
                           <col style={{ width: `${colWidths.note}%` }} />
                         </colgroup>
-                        <thead>
-                          <tr className="bg-gray-100">
-                            <th className="border border-black p-1.5 text-center relative">
-                              No
-                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                                onMouseDown={(e) => handleColumnResize('no', e.clientX, colWidths.no)} />
-                            </th>
-                            <th className="border border-black p-1.5 text-center relative">
-                              품명
-                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                                onMouseDown={(e) => handleColumnResize('name', e.clientX, colWidths.name)} />
-                            </th>
-                            <th className="border border-black p-1.5 text-center relative">
-                              규격
-                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                                onMouseDown={(e) => handleColumnResize('spec', e.clientX, colWidths.spec)} />
-                            </th>
-                            <th className="border border-black p-1.5 text-center relative">
-                              단위
-                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                                onMouseDown={(e) => handleColumnResize('unit', e.clientX, colWidths.unit)} />
-                            </th>
-                            <th className="border border-black p-1.5 text-center relative">
-                              수량
-                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                                onMouseDown={(e) => handleColumnResize('qty', e.clientX, colWidths.qty)} />
-                            </th>
-                            <th className="border border-black p-1.5 text-center relative">
-                              단가
-                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                                onMouseDown={(e) => handleColumnResize('price', e.clientX, colWidths.price)} />
-                            </th>
-                            <th className="border border-black p-1.5 text-center relative">
-                              공급가액
-                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                                onMouseDown={(e) => handleColumnResize('amount', e.clientX, colWidths.amount)} />
-                            </th>
-                            <th className="border border-black p-1.5 text-center">비고</th>
-                          </tr>
-                        </thead>
+                        {/* 첫 페이지에만 테이블 헤더 표시 */}
+                        {page.isFirst && (
+                          <thead>
+                            <tr className="bg-gray-100">
+                              <th className="border border-black p-1.5 text-center relative">
+                                No
+                                <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                                  onMouseDown={(e) => handleColumnResize('no', e.clientX, colWidths.no)} />
+                              </th>
+                              <th className="border border-black p-1.5 text-center relative">
+                                품명
+                                <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                                  onMouseDown={(e) => handleColumnResize('name', e.clientX, colWidths.name)} />
+                              </th>
+                              <th className="border border-black p-1.5 text-center relative">
+                                규격
+                                <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                                  onMouseDown={(e) => handleColumnResize('spec', e.clientX, colWidths.spec)} />
+                              </th>
+                              <th className="border border-black p-1.5 text-center relative">
+                                단위
+                                <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                                  onMouseDown={(e) => handleColumnResize('unit', e.clientX, colWidths.unit)} />
+                              </th>
+                              <th className="border border-black p-1.5 text-center relative">
+                                수량
+                                <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                                  onMouseDown={(e) => handleColumnResize('qty', e.clientX, colWidths.qty)} />
+                              </th>
+                              <th className="border border-black p-1.5 text-center relative">
+                                단가
+                                <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                                  onMouseDown={(e) => handleColumnResize('price', e.clientX, colWidths.price)} />
+                              </th>
+                              <th className="border border-black p-1.5 text-center relative">
+                                공급가액
+                                <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
+                                  onMouseDown={(e) => handleColumnResize('amount', e.clientX, colWidths.amount)} />
+                              </th>
+                              <th className="border border-black p-1.5 text-center">비고</th>
+                            </tr>
+                          </thead>
+                        )}
                         <tbody>
                           {page.items.map((row) => {
                             if (row.type === 'subtotal') {
                               return (
                                 <tr key="subtotal" className="bg-gray-50">
                                   <td colSpan={6} className="border border-black p-2 text-center font-bold">소 계</td>
-                                  <td colSpan={2} className="border border-black p-2 text-right font-bold">{data.subtotal.toLocaleString()}</td>
+                                  <td colSpan={2} className="border border-black p-2 text-right font-bold">{data.subtotal.toLocaleString()} {settings.currency}</td>
                                 </tr>
                               );
                             }
@@ -912,7 +947,7 @@ export function QuotationPage() {
                               return (
                                 <tr key="vat" className="bg-gray-50">
                                   <td colSpan={6} className="border border-black p-2 text-center font-bold">부 가 세</td>
-                                  <td colSpan={2} className="border border-black p-2 text-right font-bold">{data.vat.toLocaleString()}</td>
+                                  <td colSpan={2} className="border border-black p-2 text-right font-bold">{data.vat.toLocaleString()} {settings.currency}</td>
                                 </tr>
                               );
                             }
@@ -920,7 +955,7 @@ export function QuotationPage() {
                               return (
                                 <tr key="total" className="bg-gray-100">
                                   <td colSpan={6} className="border border-black p-2 text-center font-bold text-lg">총 합 계</td>
-                                  <td colSpan={2} className="border border-black p-2 text-right font-bold text-lg text-blue-600">{data.total.toLocaleString()}</td>
+                                  <td colSpan={2} className="border border-black p-2 text-right font-bold text-lg text-blue-600">{data.total.toLocaleString()} {settings.currency}</td>
                                 </tr>
                               );
                             }
@@ -1015,18 +1050,20 @@ export function QuotationPage() {
                   {/* [Section] Remarks & Terms (Last Page Only) */}
                   {page.isLast ? (
                     <>
-                      <div className="text-sm space-y-4 pt-2 flex-shrink-0 mt-2">
-                        <div className="flex gap-4 items-start pt-2">
-                          <span className="font-bold w-20 text-gray-700 mt-1">비고</span>
-                          <EditableTextarea 
-                            value={data.remarks} 
-                            onChange={(v) => setData({...data, remarks: v})}
-                            rows={3}
-                            placeholder="특이사항이나 비고를 입력하세요"
-                            className="flex-1 border border-gray-200 rounded p-2"
-                          />
+                      {settings.showSpecialTerms && (
+                        <div className="text-sm space-y-4 pt-2 flex-shrink-0 mt-2">
+                          <div className="flex gap-4 items-start pt-2">
+                            <span className="font-bold w-20 text-gray-700 mt-1">특수조건</span>
+                            <EditableTextarea 
+                              value={data.remarks} 
+                              onChange={(v) => setData({...data, remarks: v})}
+                              rows={3}
+                              placeholder="특수조건을 입력하세요"
+                              className="flex-1 border border-gray-200 rounded p-2"
+                            />
+                          </div>
                         </div>
-                      </div>
+                      )}
                       <div className="text-center text-gray-400 text-xs flex-shrink-0 mt-auto">
                         Generatred by BizOrder
                         {settings.showPageNumbers && <span className="ml-2">({pageIndex + 1} / {pages.length})</span>}
