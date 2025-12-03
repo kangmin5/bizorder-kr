@@ -71,11 +71,13 @@ interface QuotationData {
 type PaperSize = 'A4' | 'A3' | 'B5';
 type Orientation = 'portrait' | 'landscape';
 type Theme = 'classic' | 'modern' | 'minimal' | 'bold' | 'blue' | 'dark';
+type FontFamily = 'nanum-gothic' | 'nanum-myeongjo' | 'system';
 
 type PageSettings = {
   paperSize: PaperSize;
   orientation: Orientation;
   theme: Theme;
+  fontFamily: FontFamily;
   showPageNumbers: boolean;
   margins: number; // mm
 }
@@ -100,7 +102,7 @@ const PAPER_DIMENSIONS: Record<PaperSize, { width: number; height: number }> = {
 };
 
 const SECTION_HEIGHTS = {
-  HEADER_FIRST: 55,   // 헤더 영역 (콤팩트 레이아웃, 약 5.5cm)
+  HEADER_FIRST: 60,   // 헤더 영역 (폰트 확대 적용, 약 6cm)
   HEADER_NEXT: 10,    // 2페이지 상단 여백
   TABLE_HEADER: 10,   // 테이블 헤더
   ROW: 8,             // 품목 1줄
@@ -193,6 +195,7 @@ export function QuotationPage() {
     paperSize: 'A4',
     orientation: 'portrait',
     theme: 'classic',
+    fontFamily: 'nanum-gothic',
     showPageNumbers: true,
     margins: 10,
   });
@@ -265,6 +268,14 @@ export function QuotationPage() {
 
   const removeItem = (id: string) => {
     setData({ ...data, items: data.items.filter(item => item.id !== id) });
+  };
+
+  // 사업자등록번호 포맷팅 (###-##-#####)
+  const formatBusinessNumber = (value: string) => {
+    const numbers = value.replace(/[^0-9]/g, '').slice(0, 10);
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 5) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+    return `${numbers.slice(0, 3)}-${numbers.slice(3, 5)}-${numbers.slice(5)}`;
   };
 
   const calculateTotals = () => {
@@ -351,14 +362,23 @@ export function QuotationPage() {
     XLSX.writeFile(wb, `${data.quotationNumber}_견적서.xlsx`);
   };
 
+  const getFontStyle = () => {
+    switch (settings.fontFamily) {
+      case 'nanum-gothic': return "font-['Nanum_Gothic',sans-serif]";
+      case 'nanum-myeongjo': return "font-['Nanum_Myeongjo',serif]";
+      default: return 'font-sans';
+    }
+  };
+
   const renderThemeStyles = () => {
+    const fontClass = getFontStyle();
     switch (settings.theme) {
-      case 'modern': return 'bg-white border-l-4 border-blue-500';
-      case 'minimal': return 'bg-white grayscale';
-      case 'bold': return 'bg-slate-50 font-bold border-4 border-black';
-      case 'blue': return 'bg-blue-50 text-blue-900';
-      case 'dark': return 'bg-slate-800 text-white';
-      default: return 'bg-white border border-gray-200';
+      case 'modern': return `bg-white border-l-4 border-blue-500 ${fontClass}`;
+      case 'minimal': return `bg-white grayscale ${fontClass}`;
+      case 'bold': return `bg-slate-50 font-bold border-4 border-black ${fontClass}`;
+      case 'blue': return `bg-blue-50 text-blue-900 ${fontClass}`;
+      case 'dark': return `bg-slate-800 text-white ${fontClass}`;
+      default: return `bg-white border border-gray-200 ${fontClass}`;
     }
   };
 
@@ -515,6 +535,20 @@ export function QuotationPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-2">
+                    <Label>폰트 선택</Label>
+                    <Select 
+                      value={settings.fontFamily} 
+                      onValueChange={(v: FontFamily) => setSettings({...settings, fontFamily: v})}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="nanum-gothic">나눔고딕</SelectItem>
+                        <SelectItem value="nanum-myeongjo">나눔명조</SelectItem>
+                        <SelectItem value="system">시스템 기본</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -594,11 +628,11 @@ export function QuotationPage() {
                       </div>
 
                       {/* 좌측: 메타+수신처 / 우측: 공급자+담당자 */}
-                      <div className="flex gap-4 mb-3 text-xs">
+                      <div className="flex gap-4 mb-3 text-sm">
                         {/* 좌측 영역 */}
                         <div className="flex-1 space-y-2">
                           {/* 메타데이터 */}
-                          <div className="grid grid-cols-[70px_1fr_70px_1fr] gap-x-2 gap-y-1 items-center">
+                          <div className="grid grid-cols-[60px_1fr_60px_1fr] gap-x-3 gap-y-1.5 items-center">
                             <span className="text-gray-500">견적번호</span>
                             <EditableInput value={data.quotationNumber} onChange={(v) => setData({...data, quotationNumber: v})} className="font-medium" />
                             <span className="text-gray-500">견적일자</span>
@@ -611,17 +645,17 @@ export function QuotationPage() {
                           
                           {/* 수신처 */}
                           <div className="border-t pt-2">
-                            <div className="flex items-baseline gap-2 mb-1">
-                              <span className="text-gray-500 w-14">수신</span>
+                            <div className="flex items-baseline gap-2 mb-1.5">
+                              <span className="text-gray-500 w-12">수신</span>
                               <EditableInput 
                                 value={data.client.name} 
                                 onChange={(v) => setData({...data, client: {...data.client, name: v}})}
                                 placeholder="수신처 (고객사명)"
-                                className="text-sm font-bold flex-1"
+                                className="text-base font-bold flex-1"
                               />
-                              <span className="text-sm">귀하</span>
+                              <span className="text-base">귀하</span>
                             </div>
-                            <div className="grid grid-cols-[70px_1fr_70px_1fr] gap-x-2 gap-y-1 items-center">
+                            <div className="grid grid-cols-[60px_1fr_60px_1fr] gap-x-3 gap-y-1.5 items-center">
                               <span className="text-gray-500">담당자</span>
                               <EditableInput value={data.client.ownerName} onChange={(v) => setData({...data, client: {...data.client, ownerName: v}})} placeholder="담당자" />
                               <span className="text-gray-500">부서</span>
@@ -639,35 +673,38 @@ export function QuotationPage() {
                         </div>
 
                         {/* 우측 영역: 공급자 + 담당자 */}
-                        <div className="w-[200px] border border-gray-300 rounded p-2 text-xs flex-shrink-0">
-                          <div className="flex items-center justify-between border-b pb-1 mb-1">
+                        <div className="w-[230px] border border-gray-300 rounded p-2 text-sm flex-shrink-0">
+                          <div className="flex items-center justify-between border-b pb-1 mb-1.5">
                             <span className="font-bold">공급자</span>
                             {bannerSettings.stampImage && (
-                              <img src={bannerSettings.stampImage} alt="직인" className="w-8 h-8 object-contain" />
+                              <img src={bannerSettings.stampImage} alt="직인" className="w-10 h-10 object-contain" />
                             )}
                           </div>
-                          <div className="grid grid-cols-[45px_1fr] gap-y-0.5 items-center">
+                          <div className="grid grid-cols-[55px_1fr] gap-x-2 gap-y-1 items-center">
                             <span className="text-gray-400">상호</span>
                             <EditableInput value={data.supplier.name} onChange={(v) => setData({...data, supplier: {...data.supplier, name: v}})} />
-                            <span className="text-gray-400">등록번호</span>
-                            <EditableInput value={data.supplier.registrationNumber} onChange={(v) => setData({...data, supplier: {...data.supplier, registrationNumber: v}})} />
+                            <span className="text-gray-400 whitespace-nowrap">사업자번호</span>
+                            <EditableInput value={data.supplier.registrationNumber} onChange={(v) => setData({...data, supplier: {...data.supplier, registrationNumber: formatBusinessNumber(v)}})} className="whitespace-nowrap" placeholder="000-00-00000" />
                             <span className="text-gray-400">대표자</span>
                             <EditableInput value={data.supplier.ownerName} onChange={(v) => setData({...data, supplier: {...data.supplier, ownerName: v}})} />
                             <span className="text-gray-400">연락처</span>
                             <EditableInput value={data.supplier.phone} onChange={(v) => setData({...data, supplier: {...data.supplier, phone: v}})} />
                           </div>
-                          {/* 담당자 정보 (한 줄로) */}
-                          {(userInfo.name || userInfo.mobile) && (
-                            <div className="border-t mt-1 pt-1 text-gray-600">
-                              <span className="text-gray-400">담당: </span>
-                              {userInfo.name}{userInfo.position && ` (${userInfo.position})`}
-                              {userInfo.mobile && ` ${userInfo.mobile}`}
+                          {/* 담당자 정보 */}
+                          {(userInfo.name || userInfo.mobile || userInfo.email) && (
+                            <div className="border-t mt-1.5 pt-1.5 text-gray-600 text-xs space-y-0.5">
+                              <div>
+                                <span className="text-gray-400">담당: </span>
+                                {userInfo.name}{userInfo.position && ` (${userInfo.position})`}
+                              </div>
+                              {userInfo.mobile && <div><span className="text-gray-400">연락처: </span>{userInfo.mobile}</div>}
+                              {userInfo.email && <div><span className="text-gray-400">이메일: </span>{userInfo.email}</div>}
                             </div>
                           )}
                         </div>
                       </div>
 
-                      <p className="text-xs text-gray-500 mb-2">아래와 같이 견적합니다.</p>
+                      <p className="text-sm text-gray-600 mb-2">아래와 같이 견적합니다.</p>
                     </>
                   )}
 
