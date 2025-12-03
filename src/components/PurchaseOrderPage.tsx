@@ -66,7 +66,7 @@ interface PurchaseOrderData {
 
 type PaperSize = 'A4' | 'A3' | 'B5';
 type Orientation = 'portrait' | 'landscape';
-type Theme = 'classic' | 'modern' | 'minimal' | 'bold';
+type Theme = 'classic' | 'modern' | 'minimal' | 'bold' | 'blue' | 'dark';
 
 interface PageSettings {
   paperSize: PaperSize;
@@ -94,6 +94,13 @@ const PAPER_DIMENSIONS: Record<PaperSize, { width: number; height: number }> = {
   A3: { width: 297, height: 420 },
   B5: { width: 176, height: 250 },
 };
+
+const PAGE_CAPACITY_FIRST = 12;
+const PAGE_CAPACITY_NEXT = 24;
+
+type PageItem = 
+  | { type: 'item'; data: LineItem }
+  | { type: 'total' };
 
 // --- Helper Components ---
 
@@ -138,18 +145,30 @@ const EditableTextarea = ({
   className?: string;
   placeholder?: string;
   rows?: number;
-}) => (
-  <textarea
-    value={value}
-    onChange={(e) => onChange(e.target.value)}
-    placeholder={placeholder}
-    rows={rows}
-    className={cn(
-      "bg-transparent border border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-0.5 w-full resize-none transition-colors",
-      className
-    )}
-  />
-);
+}) => {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [value]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={rows}
+      className={cn(
+        "bg-transparent border border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-0.5 w-full resize-none transition-colors overflow-hidden",
+        className
+      )}
+    />
+  );
+};
 
 export function PurchaseOrderPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -251,21 +270,28 @@ export function PurchaseOrderPage() {
     setIsLoading(true);
 
     try {
-      const canvas = await html2canvas(printRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      });
-
-      const imgData = canvas.toDataURL('image/png');
+      const pages = printRef.current.querySelectorAll('.page-break');
       const pdf = new jsPDF({
         orientation: settings.orientation,
         unit: 'mm',
         format: settings.paperSize.toLowerCase(),
       });
 
-      const { width, height } = getPaperDimensions();
-      pdf.addImage(imgData, 'PNG', 0, 0, width, height);
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i] as HTMLElement;
+        const canvas = await html2canvas(page, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const { width, height } = getPaperDimensions();
+        
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, 0, width, height);
+      }
+
       pdf.save(`${data.orderNumber}_발주서.pdf`);
     } catch (error) {
       console.error('PDF Export failed:', error);
@@ -315,6 +341,8 @@ export function PurchaseOrderPage() {
       case 'modern': return 'bg-white border-t-4 border-green-600';
       case 'minimal': return 'bg-white';
       case 'bold': return 'bg-slate-50 font-bold border-4 border-black';
+      case 'blue': return 'bg-blue-50 text-blue-900';
+      case 'dark': return 'bg-slate-800 text-white';
       default: return 'bg-white border border-gray-200';
     }
   };
@@ -326,6 +354,57 @@ export function PurchaseOrderPage() {
       else panel.expand();
     }
   };
+
+  const getPages = () => {
+    const pages: { items: PageItem[]; isFirst: boolean; isLast: boolean }[] = [];
+    
+    // Create all rows including summary rows
+    const allRows: PageItem[] = [
+      ...data.items.map(item => ({ type: 'item' as const, data: item })),
+      { type: 'total' as const }
+    ];
+
+    let remainingRows = [...allRows];
+    
+    // 1. Chunking logic
+    // First page
+    if (remainingRows.length > 0) {
+      const chunk = remainingRows.splice(0, PAGE_CAPACITY_FIRST);
+      pages.push({ items: chunk, isFirst: true, isLast: false });
+    } else {
+      pages.push({ items: [], isFirst: true, isLast: true });
+      return pages;
+    }
+
+    // Subsequent pages
+    while (remainingRows.length > 0) {
+      const chunk = remainingRows.splice(0, PAGE_CAPACITY_NEXT);
+      pages.push({ items: chunk, isFirst: false, isLast: false });
+    }
+
+    // 2. Remarks space check
+    const lastPage = pages[pages.length - 1];
+    
+    // Calculate required space for remarks (dynamic)
+    // Base cost: Place(1) + Check(1) + Button/Spacing(2) + Safety(2) = 6 items approx
+    const remarksLines = (data.remarks.match(/\n/g) || []).length + 1;
+    const remarksHeight = Math.max(3, remarksLines);
+    const remarksCost = 6 + (remarksHeight * 0.5);
+
+    const capacity = lastPage.isFirst ? PAGE_CAPACITY_FIRST : PAGE_CAPACITY_NEXT;
+
+    if (lastPage.items.length + remarksCost > capacity) {
+      // Not enough space for remarks, add a new empty page
+      pages.push({ items: [], isFirst: false, isLast: true });
+    } else {
+      // Enough space
+      lastPage.isLast = true;
+    }
+
+    return pages;
+  };
+
+  const pages = getPages();
 
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col">
@@ -400,9 +479,9 @@ export function PurchaseOrderPage() {
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="A4">A4</SelectItem>
-                        <SelectItem value="A3">A3</SelectItem>
-                        <SelectItem value="B5">B5</SelectItem>
+                        <SelectItem value="A4">A4 (210 x 297 mm)</SelectItem>
+                        <SelectItem value="A3">A3 (297 x 420 mm)</SelectItem>
+                        <SelectItem value="B5">B5 (176 x 250 mm)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -414,8 +493,8 @@ export function PurchaseOrderPage() {
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="portrait">세로</SelectItem>
-                        <SelectItem value="landscape">가로</SelectItem>
+                        <SelectItem value="portrait">세로 (Portrait)</SelectItem>
+                        <SelectItem value="landscape">가로 (Landscape)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -431,6 +510,8 @@ export function PurchaseOrderPage() {
                         <SelectItem value="modern">모던 (그린 포인트)</SelectItem>
                         <SelectItem value="minimal">미니멀</SelectItem>
                         <SelectItem value="bold">볼드</SelectItem>
+                        <SelectItem value="blue">블루 배경</SelectItem>
+                        <SelectItem value="dark">다크 모드</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -450,6 +531,14 @@ export function PurchaseOrderPage() {
                     />
                     <Label htmlFor="vat">부가세 포함</Label>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="page-num" 
+                      checked={settings.showPageNumbers}
+                      onCheckedChange={(c) => setSettings({...settings, showPageNumbers: !!c})}
+                    />
+                    <Label htmlFor="page-num">페이지 번호 표시</Label>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -460,293 +549,324 @@ export function PurchaseOrderPage() {
 
         <ResizablePanel defaultSize={75} className="bg-slate-100">
           <div className="h-full overflow-auto">
-            <div className="flex justify-center p-8 min-w-[800px]">
-              <div 
-                ref={printRef}
-                className={cn(
-                  "shadow-lg transition-all duration-300 p-[10mm] box-border relative bg-white",
-                  renderThemeStyles()
-                )}
-                style={{
-                  width: `${getPaperDimensions().width}mm`,
-                  minHeight: `${getPaperDimensions().height}mm`,
-                  transform: `scale(${zoom / 100})`,
-                  transformOrigin: 'top center',
-                }}
-              >
-                {/* [Section] Title Header */}
-                <div className="text-center mb-8">
-                  <h1 className="text-4xl font-bold tracking-[1em] underline decoration-double underline-offset-8">발 주 서</h1>
-                </div>
+            <div className="flex flex-col items-center p-8 min-w-[800px] gap-8" ref={printRef}>
+              {pages.map((page, pageIndex) => (
+                <div 
+                  key={pageIndex}
+                  className={cn(
+                    "shadow-lg transition-all duration-300 p-[10mm] box-border relative bg-white flex flex-col page-break overflow-hidden",
+                    renderThemeStyles()
+                  )}
+                  style={{
+                    width: `${getPaperDimensions().width}mm`,
+                    height: `${getPaperDimensions().height}mm`,
+                    transform: `scale(${zoom / 100})`,
+                    transformOrigin: 'top center',
+                    marginBottom: '2rem',
+                  }}
+                >
+                  {/* [Section] Title Header & Document Info */}
+                  {page.isFirst && (
+                    <>
+                      {/* [Section] Title Header */}
+                      <div className="text-center mb-8">
+                        <h1 className="text-4xl font-bold tracking-[1em] underline decoration-double underline-offset-8">발 주 서</h1>
+                      </div>
 
-                {/* [Section] Document Info (Meta, Supplier, Client) */}
-                <div className="flex justify-between mb-8 text-sm">
-                  <div className="w-[45%]">
-                    <table className="w-full border-collapse border border-black">
+                      {/* [Section] Document Info (Meta, Supplier, Client) */}
+                      <div className="flex justify-between mb-8 text-sm">
+                        <div className="w-[45%]">
+                          <table className="w-full border-collapse border border-black">
+                            <tbody>
+                              <tr>
+                                <td className="border border-black bg-gray-100 p-2 text-center w-24 font-bold">발주번호</td>
+                                <td className="border border-black p-0">
+                                  <EditableInput 
+                                    value={data.orderNumber} 
+                                    onChange={(v) => setData({...data, orderNumber: v})}
+                                    className="px-2"
+                                  />
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="border border-black bg-gray-100 p-2 text-center font-bold">발주일자</td>
+                                <td className="border border-black p-0">
+                                  <EditableInput 
+                                    type="date"
+                                    value={data.date} 
+                                    onChange={(v) => setData({...data, date: v})}
+                                    className="px-2"
+                                  />
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="border border-black bg-gray-100 p-2 text-center font-bold">납기일자</td>
+                                <td className="border border-black p-0">
+                                  <EditableInput 
+                                    type="date"
+                                    value={data.deliveryDate} 
+                                    onChange={(v) => setData({...data, deliveryDate: v})}
+                                    className="px-2"
+                                  />
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="w-[45%]">
+                          <table className="w-full border-collapse border border-black">
+                            <tbody>
+                              <tr>
+                                <td rowSpan={4} className="border border-black bg-gray-100 p-2 text-center w-8 font-bold writing-mode-vertical">발주자</td>
+                                <td className="border border-black p-1 text-center w-16 bg-gray-50">상호</td>
+                                <td className="border border-black p-0">
+                                  <EditableInput 
+                                    value={data.client.name} 
+                                    onChange={(v) => setData({...data, client: {...data.client, name: v}})}
+                                  />
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="border border-black p-1 text-center bg-gray-50">등록번호</td>
+                                <td className="border border-black p-0">
+                                  <EditableInput 
+                                    value={data.client.registrationNumber} 
+                                    onChange={(v) => setData({...data, client: {...data.client, registrationNumber: v}})}
+                                  />
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="border border-black p-1 text-center bg-gray-50">대표자</td>
+                                <td className="border border-black p-0">
+                                  <EditableInput 
+                                    value={data.client.ownerName} 
+                                    onChange={(v) => setData({...data, client: {...data.client, ownerName: v}})}
+                                  />
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="border border-black p-1 text-center bg-gray-50">주소</td>
+                                <td className="border border-black p-0">
+                                  <EditableInput 
+                                    value={data.client.address} 
+                                    onChange={(v) => setData({...data, client: {...data.client, address: v}})}
+                                  />
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      <div className="mb-4">
+                        <div className="flex items-baseline gap-2 border-b-2 border-black pb-2 mb-2">
+                          <EditableInput 
+                            value={data.supplier.name} 
+                            onChange={(v) => setData({...data, supplier: {...data.supplier, name: v}})}
+                            placeholder="수신 (공급자 상호)"
+                            className="text-xl font-bold w-64"
+                          />
+                          <span className="text-lg">귀하</span>
+                        </div>
+                        <div className="flex gap-4 text-sm mb-2">
+                          <div className="flex items-center gap-2">
+                            <span>담당자:</span>
+                            <EditableInput 
+                              value={data.supplier.ownerName} 
+                              onChange={(v) => setData({...data, supplier: {...data.supplier, ownerName: v}})}
+                              placeholder="담당자명"
+                              className="w-32"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span>연락처:</span>
+                            <EditableInput 
+                              value={data.supplier.phone} 
+                              onChange={(v) => setData({...data, supplier: {...data.supplier, phone: v}})}
+                              placeholder="연락처"
+                              className="w-40"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-sm">아래와 같이 발주하오니 기일 엄수하여 납품 바랍니다.</p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* [Section] Line Items & Calculation */}
+                  <div className="relative overflow-y-hidden">
+                    <table className="w-full border-collapse border border-black mb-2 text-sm">
+                      <thead>
+                        <tr className="bg-gray-100">
+                          <th className="border border-black p-2 w-12">No</th>
+                          <th className="border border-black p-2">품명</th>
+                          <th className="border border-black p-2 w-20">규격</th>
+                          <th className="border border-black p-2 w-16">단위</th>
+                          <th className="border border-black p-2 w-16">수량</th>
+                          <th className="border border-black p-2 w-24">단가</th>
+                          <th className="border border-black p-2 w-28">공급가액</th>
+                          <th className="border border-black p-2 w-20">비고</th>
+                          <th className="border border-black p-1 w-8 print:hidden bg-white border-l-0" data-html2canvas-ignore></th>
+                        </tr>
+                      </thead>
                       <tbody>
-                        <tr>
-                          <td className="border border-black bg-gray-100 p-2 text-center w-24 font-bold">발주번호</td>
-                          <td className="border border-black p-0">
-                            <EditableInput 
-                              value={data.orderNumber} 
-                              onChange={(v) => setData({...data, orderNumber: v})}
-                              className="px-2"
-                            />
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-black bg-gray-100 p-2 text-center font-bold">발주일자</td>
-                          <td className="border border-black p-0">
-                            <EditableInput 
-                              type="date"
-                              value={data.date} 
-                              onChange={(v) => setData({...data, date: v})}
-                              className="px-2"
-                            />
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-black bg-gray-100 p-2 text-center font-bold">납기일자</td>
-                          <td className="border border-black p-0">
-                            <EditableInput 
-                              type="date"
-                              value={data.deliveryDate} 
-                              onChange={(v) => setData({...data, deliveryDate: v})}
-                              className="px-2"
-                            />
-                          </td>
-                        </tr>
+                        {page.items.map((row) => {
+                          if (row.type === 'total') {
+                            return (
+                              <tr key="total" className="bg-gray-100">
+                                <td colSpan={6} className="border border-black p-2 text-center font-bold text-lg">합 계 (VAT 포함)</td>
+                                <td className="border border-black p-2 text-right font-bold text-lg">{data.total.toLocaleString()}</td>
+                                <td className="border border-black p-2"></td>
+                                <td className="border-0 print:hidden" data-html2canvas-ignore></td>
+                              </tr>
+                            );
+                          }
+
+                          const item = row.data;
+                          const itemIndex = data.items.findIndex(i => i.id === item.id);
+
+                          return (
+                          <tr key={item.id} className="group hover:bg-green-50/30">
+                            <td className="border border-black p-1 text-center bg-gray-50">
+                              {itemIndex + 1}
+                            </td>
+                            <td className="border border-black p-0">
+                              <EditableInput 
+                                value={item.name} 
+                                onChange={(v) => handleItemChange(item.id, 'name', v)}
+                                className="h-full px-2"
+                              />
+                            </td>
+                            <td className="border border-black p-0">
+                              <EditableInput 
+                                value={item.spec} 
+                                onChange={(v) => handleItemChange(item.id, 'spec', v)}
+                                align="center"
+                                className="h-full px-1"
+                              />
+                            </td>
+                            <td className="border border-black p-0">
+                              <EditableInput 
+                                value={item.unit} 
+                                onChange={(v) => handleItemChange(item.id, 'unit', v)}
+                                align="center"
+                                className="h-full px-1"
+                              />
+                            </td>
+                            <td className="border border-black p-0">
+                              <EditableInput 
+                                type="number"
+                                value={item.quantity} 
+                                onChange={(v) => handleItemChange(item.id, 'quantity', Number(v))}
+                                align="right"
+                                className="h-full px-2"
+                              />
+                            </td>
+                            <td className="border border-black p-0">
+                              <EditableInput 
+                                type="number"
+                                value={item.unitPrice} 
+                                onChange={(v) => handleItemChange(item.id, 'unitPrice', Number(v))}
+                                align="right"
+                                className="h-full px-2"
+                              />
+                            </td>
+                            <td className="border border-black p-1 text-right font-medium bg-gray-50/50">
+                              {item.amount.toLocaleString()}
+                            </td>
+                            <td className="border border-black p-0">
+                              <EditableInput 
+                                value={item.note} 
+                                onChange={(v) => handleItemChange(item.id, 'note', v)}
+                                className="h-full px-2"
+                              />
+                            </td>
+                            <td className="border-0 p-0 text-center print:hidden align-middle" data-html2canvas-ignore>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 transition-all"
+                                onClick={() => removeItem(item.id)}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </td>
+                          </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
+                    
+                    {pageIndex === pages.length - 1 && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={addItem}
+                        className="print:hidden mb-4 w-full border-dashed border-2 hover:bg-gray-50 text-gray-600"
+                        data-html2canvas-ignore
+                      >
+                        <Plus className="w-4 h-4 mr-2" /> 품목 추가
+                      </Button>
+                    )}
                   </div>
-                  <div className="w-[45%]">
-                    <table className="w-full border-collapse border border-black">
-                      <tbody>
-                        <tr>
-                          <td rowSpan={4} className="border border-black bg-gray-100 p-2 text-center w-8 font-bold writing-mode-vertical">발주자</td>
-                          <td className="border border-black p-1 text-center w-16 bg-gray-50">상호</td>
-                          <td className="border border-black p-0">
-                            <EditableInput 
-                              value={data.client.name} 
-                              onChange={(v) => setData({...data, client: {...data.client, name: v}})}
-                            />
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-black p-1 text-center bg-gray-50">등록번호</td>
-                          <td className="border border-black p-0">
-                            <EditableInput 
-                              value={data.client.registrationNumber} 
-                              onChange={(v) => setData({...data, client: {...data.client, registrationNumber: v}})}
-                            />
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-black p-1 text-center bg-gray-50">대표자</td>
-                          <td className="border border-black p-0">
-                            <EditableInput 
-                              value={data.client.ownerName} 
-                              onChange={(v) => setData({...data, client: {...data.client, ownerName: v}})}
-                            />
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-black p-1 text-center bg-gray-50">주소</td>
-                          <td className="border border-black p-0">
-                            <EditableInput 
-                              value={data.client.address} 
-                              onChange={(v) => setData({...data, client: {...data.client, address: v}})}
-                            />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
 
-                <div className="mb-4">
-                  <div className="flex items-baseline gap-2 border-b-2 border-black pb-2 mb-2">
-                    <EditableInput 
-                      value={data.supplier.name} 
-                      onChange={(v) => setData({...data, supplier: {...data.supplier, name: v}})}
-                      placeholder="수신 (공급자 상호)"
-                      className="text-xl font-bold w-64"
-                    />
-                    <span className="text-lg">귀하</span>
-                  </div>
-                  <div className="flex gap-4 text-sm mb-2">
-                    <div className="flex items-center gap-2">
-                      <span>담당자:</span>
-                      <EditableInput 
-                        value={data.supplier.ownerName} 
-                        onChange={(v) => setData({...data, supplier: {...data.supplier, ownerName: v}})}
-                        placeholder="담당자명"
-                        className="w-32"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span>연락처:</span>
-                      <EditableInput 
-                        value={data.supplier.phone} 
-                        onChange={(v) => setData({...data, supplier: {...data.supplier, phone: v}})}
-                        placeholder="연락처"
-                        className="w-40"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-sm">아래와 같이 발주하오니 기일 엄수하여 납품 바랍니다.</p>
+                  {/* [Section] Remarks & Terms (Last Page Only) */}
+                  {page.isLast ? (
+                    <>
+                      <div className="border border-black p-4 text-sm space-y-2 pt-8 flex-shrink-0 mt-8">
+                        <div className="flex gap-4 items-center">
+                          <span className="font-bold w-24">납품 장소</span>
+                          <EditableInput 
+                            value={data.deliveryPlace} 
+                            onChange={(v) => setData({...data, deliveryPlace: v})}
+                          />
+                        </div>
+                        <div className="flex gap-4 items-center">
+                          <span className="font-bold w-24">검수 방법</span>
+                          <EditableInput 
+                            value={data.inspectionMethod} 
+                            onChange={(v) => setData({...data, inspectionMethod: v})}
+                          />
+                        </div>
+                        <div className="flex gap-4 items-center">
+                          <span className="font-bold w-24">결제 조건</span>
+                          <EditableInput 
+                            value={data.paymentTerms} 
+                            onChange={(v) => setData({...data, paymentTerms: v})}
+                          />
+                        </div>
+                        <div className="flex gap-4 items-start pt-2 border-t border-gray-200 mt-2">
+                          <span className="font-bold w-24 mt-1">특이사항</span>
+                          <EditableTextarea 
+                            value={data.remarks} 
+                            onChange={(v) => setData({...data, remarks: v})}
+                            rows={3}
+                            placeholder="특이사항 입력"
+                          />
+                        </div>
+                      </div>
+                      
+                      {/* [Section] Footer & Signature */}
+                      <div className="flex justify-end flex-shrink-0 mt-auto">
+                        <div className="text-center">
+                          <p className="mb-4 text-sm">위와 같이 발주합니다.</p>
+                          <div className="flex items-end gap-2">
+                            <span className="text-lg font-bold">발주 담당자 : </span>
+                            <span className="text-lg border-b border-black px-8 pb-1 w-40 inline-block"></span>
+                            <span className="text-sm">(인)</span>
+                          </div>
+                        </div>
+                        {settings.showPageNumbers && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-gray-400">{pageIndex + 1} / {pages.length}</div>}
+                      </div>
+                    </>
+                  ) : (
+                     <div className="mt-auto text-center text-gray-400 text-sm border-t pt-4">
+                        (다음 페이지에 계속)
+                        {settings.showPageNumbers && <div className="text-xs mt-1">{pageIndex + 1} / {pages.length}</div>}
+                     </div>
+                  )}
                 </div>
-
-                {/* [Section] Line Items & Calculation */}
-                <div className="relative">
-                  <table className="w-full border-collapse border border-black mb-6 text-sm">
-                    <thead>
-                      <tr className="bg-gray-100">
-                        <th className="border border-black p-2 w-12">No</th>
-                        <th className="border border-black p-2">품명</th>
-                        <th className="border border-black p-2 w-20">규격</th>
-                        <th className="border border-black p-2 w-16">단위</th>
-                        <th className="border border-black p-2 w-16">수량</th>
-                        <th className="border border-black p-2 w-24">단가</th>
-                        <th className="border border-black p-2 w-28">공급가액</th>
-                        <th className="border border-black p-2 w-20">비고</th>
-                        <th className="border border-black p-1 w-8 print:hidden bg-white border-l-0"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.items.map((item, index) => (
-                        <tr key={item.id} className="group hover:bg-green-50/30">
-                          <td className="border border-black p-1 text-center bg-gray-50">{index + 1}</td>
-                          <td className="border border-black p-0">
-                            <EditableInput 
-                              value={item.name} 
-                              onChange={(v) => handleItemChange(item.id, 'name', v)}
-                              className="h-full px-2"
-                            />
-                          </td>
-                          <td className="border border-black p-0">
-                            <EditableInput 
-                              value={item.spec} 
-                              onChange={(v) => handleItemChange(item.id, 'spec', v)}
-                              align="center"
-                              className="h-full px-1"
-                            />
-                          </td>
-                          <td className="border border-black p-0">
-                            <EditableInput 
-                              value={item.unit} 
-                              onChange={(v) => handleItemChange(item.id, 'unit', v)}
-                              align="center"
-                              className="h-full px-1"
-                            />
-                          </td>
-                          <td className="border border-black p-0">
-                            <EditableInput 
-                              type="number"
-                              value={item.quantity} 
-                              onChange={(v) => handleItemChange(item.id, 'quantity', Number(v))}
-                              align="right"
-                              className="h-full px-2"
-                            />
-                          </td>
-                          <td className="border border-black p-0">
-                            <EditableInput 
-                              type="number"
-                              value={item.unitPrice} 
-                              onChange={(v) => handleItemChange(item.id, 'unitPrice', Number(v))}
-                              align="right"
-                              className="h-full px-2"
-                            />
-                          </td>
-                          <td className="border border-black p-1 text-right font-medium bg-gray-50/50">
-                            {item.amount.toLocaleString()}
-                          </td>
-                          <td className="border border-black p-0">
-                            <EditableInput 
-                              value={item.note} 
-                              onChange={(v) => handleItemChange(item.id, 'note', v)}
-                              className="h-full px-2"
-                            />
-                          </td>
-                          <td className="border-0 p-0 text-center print:hidden align-middle">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 transition-all"
-                              onClick={() => removeItem(item.id)}
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-gray-100">
-                        <td colSpan={6} className="border border-black p-2 text-center font-bold text-lg">합 계 (VAT 포함)</td>
-                        <td className="border border-black p-2 text-right font-bold text-lg">{data.total.toLocaleString()}</td>
-                        <td className="border border-black p-2"></td>
-                        <td className="border-0 print:hidden"></td>
-                      </tr>
-                    </tfoot>
-                  </table>
-
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={addItem}
-                    className="absolute -bottom-10 left-0 print:hidden"
-                  >
-                    <Plus className="w-4 h-4 mr-2" /> 품목 추가
-                  </Button>
-                </div>
-
-                {/* [Section] Remarks & Terms */}
-                <div className="border border-black p-4 text-sm space-y-2 mt-12">
-                  <div className="flex gap-4 items-center">
-                    <span className="font-bold w-24">납품 장소</span>
-                    <EditableInput 
-                      value={data.deliveryPlace} 
-                      onChange={(v) => setData({...data, deliveryPlace: v})}
-                    />
-                  </div>
-                  <div className="flex gap-4 items-center">
-                    <span className="font-bold w-24">검수 방법</span>
-                    <EditableInput 
-                      value={data.inspectionMethod} 
-                      onChange={(v) => setData({...data, inspectionMethod: v})}
-                    />
-                  </div>
-                  <div className="flex gap-4 items-center">
-                    <span className="font-bold w-24">결제 조건</span>
-                    <EditableInput 
-                      value={data.paymentTerms} 
-                      onChange={(v) => setData({...data, paymentTerms: v})}
-                    />
-                  </div>
-                  <div className="flex gap-4 items-start pt-2 border-t border-gray-200 mt-2">
-                    <span className="font-bold w-24 mt-1">특이사항</span>
-                    <EditableTextarea 
-                      value={data.remarks} 
-                      onChange={(v) => setData({...data, remarks: v})}
-                      rows={3}
-                      placeholder="특이사항 입력"
-                    />
-                  </div>
-                </div>
-                
-                {/* [Section] Footer & Signature */}
-                <div className="mt-12 flex justify-end">
-                  <div className="text-center">
-                    <p className="mb-4 text-sm">위와 같이 발주합니다.</p>
-                    <div className="flex items-end gap-2">
-                      <span className="text-lg font-bold">발주 담당자 : </span>
-                      <span className="text-lg border-b border-black px-8 pb-1 w-40 inline-block"></span>
-                      <span className="text-sm">(인)</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </ResizablePanel>

@@ -1,10 +1,4 @@
-import { useState } from "react";
 import {
-  User,
-  Building,
-  Mail,
-  Phone,
-  CreditCard,
   Image,
   LogOut,
   FileText,
@@ -30,11 +24,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import { useSettingsStore } from "../stores/useSettingsStore";
+import { toast } from "sonner";
 
 export function SettingsPage() {
-  const [bannerPosition, setBannerPosition] = useState("top");
-  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
-  const [stampPreview, setStampPreview] = useState<string | null>(null);
+  const { 
+    companyInfo, setCompanyInfo,
+    userInfo, setUserInfo,
+    bannerSettings, setBannerSettings,
+    taxSettings, setTaxSettings
+  } = useSettingsStore();
+
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'banner' | 'stamp') => {
     const file = e.target.files?.[0];
@@ -42,13 +42,17 @@ export function SettingsPage() {
       const reader = new FileReader();
       reader.onloadend = () => {
         if (type === 'banner') {
-          setBannerPreview(reader.result as string);
+          setBannerSettings({ bannerImage: reader.result as string });
         } else {
-          setStampPreview(reader.result as string);
+          setBannerSettings({ stampImage: reader.result as string });
         }
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleSave = (section: string) => {
+    toast.success(`${section} 저장 완료`);
   };
 
   return (
@@ -82,7 +86,9 @@ export function SettingsPage() {
                   </Label>
                   <Input
                     id="company-name"
-                    defaultValue="(주)비즈오더"
+                    value={companyInfo.name}
+                    onChange={(e) => setCompanyInfo({ name: e.target.value })}
+                    placeholder="(주)비즈오더"
                     required
                   />
                 </div>
@@ -90,7 +96,13 @@ export function SettingsPage() {
                   <Label htmlFor="ceo-name">
                     대표자 <span className="text-red-500">*</span>
                   </Label>
-                  <Input id="ceo-name" defaultValue="홍길동" required />
+                  <Input 
+                    id="ceo-name" 
+                    value={companyInfo.ceoName}
+                    onChange={(e) => setCompanyInfo({ ceoName: e.target.value })}
+                    placeholder="홍길동" 
+                    required 
+                  />
                 </div>
               </div>
 
@@ -101,7 +113,9 @@ export function SettingsPage() {
                   </Label>
                   <Input
                     id="business-number"
-                    defaultValue="123-45-67890"
+                    value={companyInfo.businessNumber}
+                    onChange={(e) => setCompanyInfo({ businessNumber: e.target.value })}
+                    placeholder="123-45-67890"
                     required
                   />
                 </div>
@@ -109,6 +123,8 @@ export function SettingsPage() {
                   <Label htmlFor="company-regist-num">법인등록번호</Label>
                   <Input
                     id="company-regist-num"
+                    value={companyInfo.corporateNumber}
+                    onChange={(e) => setCompanyInfo({ corporateNumber: e.target.value })}
                     placeholder="법인사업자인 경우 입력"
                   />
                 </div>
@@ -119,7 +135,13 @@ export function SettingsPage() {
                   <Label htmlFor="business-type">
                     업태 <span className="text-red-500">*</span>
                   </Label>
-                  <Input id="business-type" defaultValue="서비스" required />
+                  <Input 
+                    id="business-type" 
+                    value={companyInfo.businessType}
+                    onChange={(e) => setCompanyInfo({ businessType: e.target.value })}
+                    placeholder="서비스" 
+                    required 
+                  />
                 </div>
                 <div>
                   <Label htmlFor="business-item">
@@ -127,7 +149,9 @@ export function SettingsPage() {
                   </Label>
                   <Input
                     id="business-item"
-                    defaultValue="소프트웨어 개발"
+                    value={companyInfo.businessItem}
+                    onChange={(e) => setCompanyInfo({ businessItem: e.target.value })}
+                    placeholder="소프트웨어 개발"
                     required
                   />
                 </div>
@@ -139,7 +163,9 @@ export function SettingsPage() {
                 </Label>
                 <Input
                   id="address"
-                  defaultValue="서울시 강남구 테헤란로 123"
+                  value={companyInfo.address}
+                  onChange={(e) => setCompanyInfo({ address: e.target.value })}
+                  placeholder="서울시 강남구 테헤란로 123"
                   required
                 />
               </div>
@@ -147,11 +173,21 @@ export function SettingsPage() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="phone">전화번호</Label>
-                  <Input id="phone" defaultValue="02-1234-5678" />
+                  <Input 
+                    id="phone" 
+                    value={companyInfo.phone}
+                    onChange={(e) => setCompanyInfo({ phone: e.target.value })}
+                    placeholder="02-1234-5678" 
+                  />
                 </div>
                 <div>
                   <Label htmlFor="fax">팩스</Label>
-                  <Input id="fax" defaultValue="02-1234-5679" />
+                  <Input 
+                    id="fax" 
+                    value={companyInfo.fax}
+                    onChange={(e) => setCompanyInfo({ fax: e.target.value })}
+                    placeholder="02-1234-5679" 
+                  />
                 </div>
               </div>
 
@@ -160,12 +196,14 @@ export function SettingsPage() {
                 <Input
                   id="email"
                   type="email"
-                  defaultValue="contact@bizorder.kr"
+                  value={companyInfo.email}
+                  onChange={(e) => setCompanyInfo({ email: e.target.value })}
+                  placeholder="contact@bizorder.kr"
                 />
               </div>
             </CardContent>
             <CardFooter>
-              <Button>저장하기</Button>
+              <Button onClick={() => handleSave('회사정보')}>저장하기</Button>
             </CardFooter>
           </Card>
         </TabsContent>
@@ -184,8 +222,8 @@ export function SettingsPage() {
                 <div className="space-y-2">
                   <Label>배너 위치</Label>
                   <Select
-                    value={bannerPosition}
-                    onValueChange={setBannerPosition}
+                    value={bannerSettings.position}
+                    onValueChange={(v) => setBannerSettings({ position: v as 'top' | 'right' | 'left' })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="배너 위치 선택" />
@@ -202,9 +240,9 @@ export function SettingsPage() {
                   <Label>회사 배너</Label>
                   <div className="flex flex-col gap-4 p-4 border rounded-lg bg-gray-50 border-dashed">
                     <div className="w-full h-32 bg-white rounded border flex items-center justify-center text-gray-300 overflow-hidden relative">
-                      {bannerPreview ? (
+                      {bannerSettings.bannerImage ? (
                         <img 
-                          src={bannerPreview} 
+                          src={bannerSettings.bannerImage} 
                           alt="배너 미리보기" 
                           className="w-full h-full object-contain"
                         />
@@ -214,7 +252,7 @@ export function SettingsPage() {
                     </div>
                     <div className="space-y-2">
                       <p className="text-sm text-gray-600">
-                        {bannerPosition === "top"
+                        {bannerSettings.position === "top"
                           ? "견적서 상단에 표시될 배너 이미지를 업로드하세요 (권장 크기: 1200x200px)"
                           : "제목 옆에 표시될 배너 이미지를 업로드하세요 (권장 크기: 400x150px)"}
                       </p>
@@ -233,9 +271,9 @@ export function SettingsPage() {
                   <Label>회사 도장(직인)이미지</Label>
                   <div className="flex items-center gap-4 p-4 border rounded-lg bg-gray-50 border-dashed">
                     <div className="w-24 h-24 bg-white rounded border flex items-center justify-center text-gray-300 overflow-hidden relative">
-                      {stampPreview ? (
+                      {bannerSettings.stampImage ? (
                         <img 
-                          src={stampPreview} 
+                          src={bannerSettings.stampImage} 
                           alt="도장 미리보기" 
                           className="w-full h-full object-contain"
                         />
@@ -259,7 +297,7 @@ export function SettingsPage() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button>이미지 저장</Button>
+              <Button onClick={() => handleSave('배너 설정')}>이미지 저장</Button>
             </CardFooter>
           </Card>
         </TabsContent>
@@ -276,7 +314,11 @@ export function SettingsPage() {
             <CardContent className="space-y-4">
               <div className="space-y-4">
                 <div className="flex items-center space-x-2">
-                  <Checkbox id="auto-issue" />
+                  <Checkbox 
+                    id="auto-issue" 
+                    checked={taxSettings.autoIssue}
+                    onCheckedChange={(checked) => setTaxSettings({ autoIssue: !!checked })}
+                  />
                   <Label htmlFor="auto-issue">
                     결제 완료 시 자동으로 세금계산서 발행
                   </Label>
@@ -287,13 +329,20 @@ export function SettingsPage() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="tax-manager">세금계산서 담당자명</Label>
-                    <Input id="tax-manager" placeholder="담당자 이름" />
+                    <Input 
+                      id="tax-manager" 
+                      value={taxSettings.managerName}
+                      onChange={(e) => setTaxSettings({ managerName: e.target.value })}
+                      placeholder="담당자 이름" 
+                    />
                   </div>
                   <div>
                     <Label htmlFor="tax-email">발행용 이메일</Label>
                     <Input
                       id="tax-email"
                       type="email"
+                      value={taxSettings.email}
+                      onChange={(e) => setTaxSettings({ email: e.target.value })}
                       placeholder="tax@company.com"
                     />
                   </div>
@@ -314,7 +363,7 @@ export function SettingsPage() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button>설정 저장</Button>
+              <Button onClick={() => handleSave('세금계산서 설정')}>설정 저장</Button>
             </CardFooter>
           </Card>
         </TabsContent>
@@ -332,22 +381,42 @@ export function SettingsPage() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="user-name">이름</Label>
-                  <Input id="user-name" defaultValue="홍길동" />
+                  <Input 
+                    id="user-name" 
+                    value={userInfo.name}
+                    onChange={(e) => setUserInfo({ name: e.target.value })}
+                    placeholder="홍길동" 
+                  />
                 </div>
                 <div>
                   <Label htmlFor="user-department">부서/팀</Label>
-                  <Input id="user-department" defaultValue="경영지원팀" />
+                  <Input 
+                    id="user-department" 
+                    value={userInfo.department}
+                    onChange={(e) => setUserInfo({ department: e.target.value })}
+                    placeholder="경영지원팀" 
+                  />
                 </div>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="user-position">직위/직책</Label>
-                  <Input id="user-position" defaultValue="대표" />
+                  <Input 
+                    id="user-position" 
+                    value={userInfo.position}
+                    onChange={(e) => setUserInfo({ position: e.target.value })}
+                    placeholder="대표" 
+                  />
                 </div>
                 <div>
                   <Label htmlFor="user-phone">휴대전화</Label>
-                  <Input id="user-phone" defaultValue="010-1234-5678" />
+                  <Input 
+                    id="user-phone" 
+                    value={userInfo.mobile}
+                    onChange={(e) => setUserInfo({ mobile: e.target.value })}
+                    placeholder="010-1234-5678" 
+                  />
                 </div>
               </div>
 
@@ -356,12 +425,13 @@ export function SettingsPage() {
                 <Input
                   id="user-email"
                   type="email"
-                  defaultValue="user@example.com"
-                  disabled
+                  value={userInfo.email}
+                  onChange={(e) => setUserInfo({ email: e.target.value })}
+                  placeholder="user@example.com"
                   className="bg-gray-50"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  이메일 주소는 변경할 수 없습니다.
+                  로그인 이메일은 변경할 수 없습니다.
                 </p>
               </div>
 
@@ -386,7 +456,7 @@ export function SettingsPage() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button>정보 수정</Button>
+              <Button onClick={() => handleSave('회원정보')}>정보 수정</Button>
             </CardFooter>
           </Card>
         </TabsContent>
