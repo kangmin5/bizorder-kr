@@ -755,9 +755,7 @@ export function QuotationPage() {
                       const template = QUOTATION_TEMPLATES.find(t => t.id === v);
                       if (template) {
                         setSelectedTemplate(template);
-                        if (template.defaultSpecialTerms) {
-                          setData(prev => ({ ...prev, remarks: template.defaultSpecialTerms || '' }));
-                        }
+                        setData(prev => ({ ...prev, remarks: template.defaultSpecialTerms || '' }));
                       }
                     }}
                   >
@@ -938,8 +936,8 @@ export function QuotationPage() {
                     <>
                       {/* 배너 이미지 - 상단 위치인 경우 */}
                       {bannerSettings.bannerImage && bannerSettings.position === 'top' && (
-                        <div className="mb-2 flex justify-center">
-                          <img src={bannerSettings.bannerImage} alt="회사 배너" className="max-h-12 object-contain" />
+                        <div className="-mt-[10mm] -mx-[10mm]">
+                          <img src={bannerSettings.bannerImage} alt="회사 배너" className="w-[190mm] max-h-[50mm] mx-auto" />
                         </div>
                       )}
 
@@ -1016,7 +1014,7 @@ export function QuotationPage() {
                             <span className="text-gray-400">상호</span>
                             <EditableInput value={data.supplier.name} onChange={(v) => setData({...data, supplier: {...data.supplier, name: v}})} />
                             <span className="text-gray-400 whitespace-nowrap">사업자번호</span>
-                            <EditableInput value={data.supplier.registrationNumber} onChange={(v) => setData({...data, supplier: {...data.supplier, registrationNumber: formatBusinessNumber(v)}})} className="whitespace-nowrap" placeholder="000-00-00000" />
+                            <EditableInput value={formatBusinessNumber(data.supplier.registrationNumber)} onChange={(v) => setData({...data, supplier: {...data.supplier, registrationNumber: v.replace(/-/g, '')}})} className="whitespace-nowrap" placeholder="000-00-00000" />
                             <span className="text-gray-400">대표자</span>
                             <EditableInput value={data.supplier.ownerName} onChange={(v) => setData({...data, supplier: {...data.supplier, ownerName: v}})} />
                             <span className="text-gray-400">연락처</span>
@@ -1024,13 +1022,13 @@ export function QuotationPage() {
                           </div>
                           {/* 담당자 정보 */}
                           {(userInfo.name || userInfo.mobile || userInfo.email) && (
-                            <div className="border-t mt-1.5 pt-1.5 text-gray-600 text-xs space-y-0.5">
-                              <div>
-                                <span className="text-gray-400">담당: </span>
-                                {userInfo.name}{userInfo.position && ` (${userInfo.position})`}
+                            <div className="border-t mt-1.5 pt-1.5 text-gray-600 text-xs">
+                              <div className="grid grid-cols-[50px_1fr] gap-x-2 gap-y-0.5 items-center">
+                                <span className="text-gray-400">담당</span>
+                                <span>{userInfo.name}{userInfo.position && ` (${userInfo.position})`}</span>
+                                {userInfo.mobile && <><span className="text-gray-400">연락처</span><span>{userInfo.mobile}</span></>}
+                                {userInfo.email && <><span className="text-gray-400">이메일</span><span>{userInfo.email}</span></>}
                               </div>
-                              {userInfo.mobile && <div><span className="text-gray-400">연락처: </span>{userInfo.mobile}</div>}
-                              {userInfo.email && <div><span className="text-gray-400">이메일: </span>{userInfo.email}</div>}
                             </div>
                           )}
                         </div>

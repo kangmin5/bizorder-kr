@@ -715,8 +715,8 @@ export function PurchaseOrderPage() {
                   {page.isFirst && (
                     <>
                       {bannerSettings.bannerImage && bannerSettings.position === 'top' && (
-                        <div className="mb-2 flex justify-center">
-                          <img src={bannerSettings.bannerImage} alt="회사 배너" className="max-h-12 object-contain" />
+                        <div className="-mt-[10mm] -mx-[10mm] mb-2">
+                          <img src={bannerSettings.bannerImage} alt="회사 배너" className="w-[190mm] max-h-[50mm] mx-auto" />
                         </div>
                       )}
 
@@ -754,7 +754,7 @@ export function PurchaseOrderPage() {
                               <EditableInput value={data.supplier.name} onChange={(v) => setData({...data, supplier: {...data.supplier, name: v}})} placeholder="공급자 (회사명)" className="text-sm font-bold flex-1" />
                               <span className="text-sm">귀하</span>
                             </div>
-                            <div className="grid grid-cols-[70px_1fr_70px_1fr] gap-x-2 gap-y-1 items-center">
+                            <div className="grid grid-cols-[70px_1fr_70px_1fr] gap-x-3 gap-y-1 items-center">
                               <span className="text-gray-500">담당자</span>
                               <EditableInput value={data.supplier.ownerName} onChange={(v) => setData({...data, supplier: {...data.supplier, ownerName: v}})} placeholder="담당자" />
                               <span className="text-gray-500">부서</span>
@@ -776,21 +776,24 @@ export function PurchaseOrderPage() {
                             <span className="font-bold">발주처</span>
                             {bannerSettings.stampImage && <img src={bannerSettings.stampImage} alt="직인" className="w-8 h-8 object-contain" />}
                           </div>
-                          <div className="grid grid-cols-[45px_1fr] gap-y-0.5 items-center">
+                          <div className="grid grid-cols-[50px_1fr] gap-x-2 gap-y-0.5 items-center">
                             <span className="text-gray-400">상호</span>
                             <EditableInput value={data.orderer.name} onChange={(v) => setData({...data, orderer: {...data.orderer, name: v}})} />
-                            <span className="text-gray-400">등록번호</span>
-                            <EditableInput value={data.orderer.registrationNumber} onChange={(v) => setData({...data, orderer: {...data.orderer, registrationNumber: formatBusinessNumber(v)}})} placeholder="000-00-00000" />
+                            <span className="text-gray-400 whitespace-nowrap">사업자번호</span>
+                            <EditableInput value={formatBusinessNumber(data.orderer.registrationNumber)} onChange={(v) => setData({...data, orderer: {...data.orderer, registrationNumber: v.replace(/-/g, '')}})} placeholder="000-00-00000" />
                             <span className="text-gray-400">대표자</span>
                             <EditableInput value={data.orderer.ownerName} onChange={(v) => setData({...data, orderer: {...data.orderer, ownerName: v}})} />
                             <span className="text-gray-400">연락처</span>
                             <EditableInput value={data.orderer.phone} onChange={(v) => setData({...data, orderer: {...data.orderer, phone: v}})} />
                           </div>
-                          {(userInfo.name || userInfo.mobile) && (
-                            <div className="border-t mt-1 pt-1 text-gray-600">
-                              <span className="text-gray-400">담당: </span>
-                              {userInfo.name}{userInfo.position && ` (${userInfo.position})`}
-                              {userInfo.mobile && ` ${userInfo.mobile}`}
+                          {(userInfo.name || userInfo.mobile || userInfo.email) && (
+                            <div className="border-t mt-1 pt-1 text-gray-600 text-xs">
+                              <div className="grid grid-cols-[50px_1fr] gap-x-2 gap-y-0.5 items-center">
+                                <span className="text-gray-400">담당</span>
+                                <span>{userInfo.name}{userInfo.position && ` (${userInfo.position})`}</span>
+                                {userInfo.mobile && <><span className="text-gray-400">연락처</span><span>{userInfo.mobile}</span></>}
+                                {userInfo.email && <><span className="text-gray-400">이메일</span><span>{userInfo.email}</span></>}
+                              </div>
                             </div>
                           )}
                         </div>

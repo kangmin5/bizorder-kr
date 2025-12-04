@@ -253,7 +253,7 @@ export function SettingsPage() {
                     <div className="space-y-2">
                       <p className="text-sm text-gray-600">
                         {bannerSettings.position === "top"
-                          ? "견적서 상단에 표시될 배너 이미지를 업로드하세요 (권장 크기: 1200x200px)"
+                          ? "견적서 상단에 표시될 배너 이미지를 업로드하세요 (권장 크기: 190mmx40mm, PNG,JPG)"
                           : "제목 옆에 표시될 배너 이미지를 업로드하세요 (권장 크기: 400x150px)"}
                       </p>
                       <Input
