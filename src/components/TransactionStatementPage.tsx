@@ -122,7 +122,8 @@ const EditableInput = ({
   className, 
   placeholder, 
   type = "text",
-  align = "left"
+  align = "left",
+  multiline = false
 }: { 
   value: string | number; 
   onChange: (val: string) => void; 
@@ -130,20 +131,41 @@ const EditableInput = ({
   placeholder?: string;
   type?: string;
   align?: "left" | "center" | "right";
-}) => (
-  <input
-    type={type}
-    value={value}
-    onChange={(e) => onChange(e.target.value)}
-    placeholder={placeholder}
-    className={cn(
-      "bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-0.5 w-full transition-colors",
-      align === "center" && "text-center",
-      align === "right" && "text-right",
-      className
-    )}
-  />
-);
+  multiline?: boolean;
+}) => {
+  if (multiline) {
+    return (
+      <div
+        contentEditable
+        suppressContentEditableWarning
+        onBlur={(e) => onChange(e.currentTarget.textContent || '')}
+        className={cn(
+          "bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-0.5 w-full transition-colors min-h-[1.5em] whitespace-pre-wrap break-words",
+          align === "center" && "text-center",
+          align === "right" && "text-right",
+          className
+        )}
+        style={{ wordBreak: 'break-word' }}
+      >
+        {value || placeholder}
+      </div>
+    );
+  }
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className={cn(
+        "bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-0.5 w-full transition-colors",
+        align === "center" && "text-center",
+        align === "right" && "text-right",
+        className
+      )}
+    />
+  );
+};
 
 // 숫자 입력용 컴포넌트 - blur 시에만 포맷팅 적용
 const NumberInput = ({ 
@@ -682,7 +704,7 @@ export function TransactionStatementPage() {
             <div className="flex flex-col items-center p-8 min-w-[800px] gap-8" ref={printRef}>
               {pages.map((page, pageIndex) => (
                 <div key={pageIndex} id={`ts-page-${pageIndex}`}
-                  className={cn("shadow-lg transition-all duration-300 p-[10mm] box-border relative bg-white flex flex-col page-break overflow-hidden", renderThemeStyles())}
+                  className={cn("shadow-lg transition-all duration-300 p-[10mm] box-border relative bg-white flex flex-col page-break", renderThemeStyles())}
                   style={{ width: `${getPaperDimensions().width}mm`, height: `${getPaperDimensions().height}mm`, transform: `scale(${zoom / 100})`, transformOrigin: 'top center', marginBottom: '2rem' }}>
                   
                   {page.isFirst && (
@@ -779,7 +801,7 @@ export function TransactionStatementPage() {
                     {page.isFirst && (
                       <div className="text-right text-xs text-gray-500 mb-1">(단위: {settings.currency})</div>
                     )}
-                    <table className="w-full border-collapse border border-black mb-2 text-sm table-fixed">
+                    <table className="w-full border-collapse border border-black mb-2 text-sm table-fixed" style={{ wordBreak: 'break-word' }}>
                       <colgroup>
                         <col style={{ width: `${colWidths.no}%` }} />
                         <col style={{ width: `${colWidths.name}%` }} />
@@ -864,10 +886,10 @@ export function TransactionStatementPage() {
                             <tr key={item.id} className="group hover:bg-green-50/30 relative">
                               <td className="border border-black p-1 text-center bg-gray-50">{itemIndex + 1}</td>
                               <td className="border border-black p-0">
-                                <EditableInput value={item.name} onChange={(v) => handleItemChange(item.id, 'name', v)} align="left" className="h-full px-2" />
+                                <EditableInput value={item.name} onChange={(v) => handleItemChange(item.id, 'name', v)} align="left" multiline className="h-full px-2" />
                               </td>
                               <td className="border border-black p-0">
-                                <EditableInput value={item.spec} onChange={(v) => handleItemChange(item.id, 'spec', v)} align="left" className="h-full px-1" />
+                                <EditableInput value={item.spec} onChange={(v) => handleItemChange(item.id, 'spec', v)} align="left" multiline className="h-full px-1" />
                               </td>
                               <td className="border border-black p-0">
                                 <EditableInput value={item.unit} onChange={(v) => handleItemChange(item.id, 'unit', v)} align="center" className="h-full px-1" />
@@ -880,7 +902,7 @@ export function TransactionStatementPage() {
                               </td>
                               <td className="border border-black p-1 text-right font-medium bg-gray-50/50">{item.amount.toLocaleString()}</td>
                               <td className="border border-black p-0 relative">
-                                <EditableInput value={item.note} onChange={(v) => handleItemChange(item.id, 'note', v)} align="center" className="h-full px-2" />
+                                <EditableInput value={item.note} onChange={(v) => handleItemChange(item.id, 'note', v)} align="center" multiline className="h-full px-2" />
                                 <div className="absolute left-full top-0 bottom-0 flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity print:hidden" data-html2canvas-ignore>
                                   <Button variant="ghost" size="icon" className="h-6 w-6 text-green-500 hover:text-green-600 hover:bg-green-50" onClick={() => insertItemAfter(itemIndex)} title="아래에 항목 추가">
                                     <Plus className="w-3 h-3" />

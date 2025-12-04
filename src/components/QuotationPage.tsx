@@ -86,7 +86,82 @@ type PageSettings = {
   margins: number; // mm
 }
 
+// 양식 템플릿 타입
+type TemplateColumn = {
+  key: string;
+  label: string;
+  width: number;
+  type: 'text' | 'number' | 'currency';
+  align?: 'left' | 'center' | 'right';
+}
+
+type QuotationTemplate = {
+  id: string;
+  name: string;
+  title: string;
+  description: string;
+  columns: TemplateColumn[];
+  defaultSpecialTerms?: string;
+  defaultUnit?: string;
+}
+
 // --- Constants ---
+
+// 양식 템플릿 정의
+const QUOTATION_TEMPLATES: QuotationTemplate[] = [
+  {
+    id: 'standard',
+    name: '일반 견적서',
+    title: '견 적 서',
+    description: '일반적인 상품/서비스 견적용',
+    defaultUnit: 'EA',
+    columns: [
+      { key: 'no', label: 'No', width: 4, type: 'text', align: 'center' },
+      { key: 'name', label: '품명', width: 30, type: 'text', align: 'left' },
+      { key: 'spec', label: '규격', width: 13, type: 'text', align: 'left' },
+      { key: 'unit', label: '단위', width: 6, type: 'text', align: 'center' },
+      { key: 'quantity', label: '수량', width: 8, type: 'number', align: 'center' },
+      { key: 'unitPrice', label: '단가', width: 12, type: 'currency', align: 'right' },
+      { key: 'amount', label: '공급가액', width: 13, type: 'currency', align: 'right' },
+      { key: 'note', label: '비고', width: 14, type: 'text', align: 'center' },
+    ],
+  },
+  {
+    id: 'maintenance',
+    name: '유지보수 견적서',
+    title: '유지보수 견적서',
+    description: 'IT 시스템 유지보수 계약용',
+    defaultUnit: 'M/M',
+    defaultSpecialTerms: '기간: 2025년 01월 01일 ~ 2025년 12월 31일',
+    columns: [
+      { key: 'no', label: 'No', width: 5, type: 'text', align: 'center' },
+      { key: 'name', label: '품명', width: 40, type: 'text', align: 'left' },
+      { key: 'unit', label: '단위(M/M)', width: 10, type: 'text', align: 'center' },
+      { key: 'quantity', label: '개월', width: 10, type: 'number', align: 'center' },
+      { key: 'unitPrice', label: '월단가', width: 15, type: 'currency', align: 'right' },
+      { key: 'amount', label: '공급가액', width: 20, type: 'currency', align: 'right' },
+    ],
+  },
+  {
+    id: 'construction',
+    name: '건설용 견적서',
+    title: '공 사 견 적 서',
+    description: '건설/공사 견적용 (A3 가로 권장)',
+    defaultUnit: '식',
+    columns: [
+      { key: 'no', label: 'No', width: 3, type: 'text', align: 'center' },
+      { key: 'name', label: '공종/품명', width: 20, type: 'text', align: 'left' },
+      { key: 'spec', label: '규격', width: 12, type: 'text', align: 'left' },
+      { key: 'unit', label: '단위', width: 5, type: 'text', align: 'center' },
+      { key: 'quantity', label: '수량', width: 7, type: 'number', align: 'center' },
+      { key: 'materialCost', label: '재료비', width: 11, type: 'currency', align: 'right' },
+      { key: 'laborCost', label: '노무비', width: 11, type: 'currency', align: 'right' },
+      { key: 'expense', label: '경비', width: 10, type: 'currency', align: 'right' },
+      { key: 'amount', label: '합계', width: 11, type: 'currency', align: 'right' },
+      { key: 'note', label: '비고', width: 10, type: 'text', align: 'center' },
+    ],
+  },
+];
 
 const INITIAL_ITEM: LineItem = {
   id: '',
@@ -125,7 +200,8 @@ const EditableInput = ({
   className, 
   placeholder, 
   type = "text",
-  align = "left" 
+  align = "left",
+  multiline = false
 }: { 
   value: string | number; 
   onChange: (val: string) => void; 
@@ -133,20 +209,41 @@ const EditableInput = ({
   placeholder?: string;
   type?: string;
   align?: "left" | "center" | "right";
-}) => (
-  <input
-    type={type}
-    value={value}
-    onChange={(e) => onChange(e.target.value)}
-    placeholder={placeholder}
-    className={cn(
-      "bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-0.5 w-full transition-colors",
-      align === "center" && "text-center",
-      align === "right" && "text-right",
-      className
-    )}
-  />
-);
+  multiline?: boolean;
+}) => {
+  if (multiline) {
+    return (
+      <div
+        contentEditable
+        suppressContentEditableWarning
+        onBlur={(e) => onChange(e.currentTarget.textContent || '')}
+        className={cn(
+          "bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-0.5 w-full transition-colors min-h-[1.5em] whitespace-pre-wrap break-words",
+          align === "center" && "text-center",
+          align === "right" && "text-right",
+          className
+        )}
+        style={{ wordBreak: 'break-word' }}
+      >
+        {value || placeholder}
+      </div>
+    );
+  }
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className={cn(
+        "bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-0.5 w-full transition-colors",
+        align === "center" && "text-center",
+        align === "right" && "text-right",
+        className
+      )}
+    />
+  );
+};
 
 // 숫자 입력용 컴포넌트 - blur 시에만 포맷팅 적용
 const NumberInput = ({ 
@@ -263,6 +360,10 @@ export function QuotationPage() {
   const [zoom, setZoom] = useState(100);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const sidebarRef = useRef<ImperativePanelHandle>(null);
+  
+  // 양식 선택 상태
+  const [selectedTemplate, setSelectedTemplate] = useState<QuotationTemplate>(QUOTATION_TEMPLATES[0]);
+  
   const [settings, setSettings] = useState<PageSettings>({
     paperSize: 'A4',
     orientation: 'portrait',
@@ -281,26 +382,32 @@ export function QuotationPage() {
     vatRounding: 'round' as 'round' | 'floor' | 'ceil',  // 부가세 반올림 방식
   });
 
-  // 컬럼 너비 상태 (퍼센트)
-  const [colWidths, setColWidths] = useState({
-    no: 4,
-    name: 34,
-    spec: 13,
-    unit: 6,
-    qty: 8,
-    price: 12,
-    amount: 13,
-    note: 10,
+  // 컬럼 너비 상태 (퍼센트) - 양식별로 동적으로 관리
+  const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
+    const widths: Record<string, number> = {};
+    QUOTATION_TEMPLATES[0].columns.forEach(col => {
+      widths[col.key] = col.width;
+    });
+    return widths;
   });
 
+  // 양식 변경 시 컬럼 너비 초기화
+  useEffect(() => {
+    const widths: Record<string, number> = {};
+    selectedTemplate.columns.forEach(col => {
+      widths[col.key] = col.width;
+    });
+    setColWidths(widths);
+  }, [selectedTemplate]);
+
   // 컬럼 리사이즈 핸들러
-  const handleColumnResize = (column: keyof typeof colWidths, startX: number, startWidth: number) => {
+  const handleColumnResize = (columnKey: string, startX: number, startWidth: number) => {
     const onMouseMove = (e: MouseEvent) => {
       const tableWidth = 680; // 대략적인 테이블 픽셀 너비
       const deltaX = e.clientX - startX;
       const deltaPercent = (deltaX / tableWidth) * 100;
-      const newWidth = Math.max(2, Math.min(50, startWidth + deltaPercent));
-      setColWidths(prev => ({ ...prev, [column]: newWidth }));
+      const newWidth = Math.max(3, Math.min(50, startWidth + deltaPercent));
+      setColWidths(prev => ({ ...prev, [columnKey]: newWidth }));
     };
     const onMouseUp = () => {
       document.removeEventListener('mousemove', onMouseMove);
@@ -630,114 +737,123 @@ export function QuotationPage() {
           className={cn("bg-gray-50 border-r", !isSidebarOpen && "min-w-[0px] border-none")}
         >
           <div className="h-full overflow-auto">
-            <div className="p-4 space-y-6">
-              <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
-                <Settings2 className="w-5 h-5" />
+            <div className="p-3 space-y-3">
+              <div className="flex items-center gap-2 text-base font-semibold text-gray-900">
+                <Settings2 className="w-4 h-4" />
                 문서 설정
               </div>
 
+              {/* 견적서 양식 선택 */}
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">스타일 & 레이아웃</CardTitle>
+                <CardHeader className="pb-2 pt-3 px-3">
+                  <CardTitle className="text-sm">📋 견적서 양식</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>용지 크기</Label>
-                    <Select 
-                      value={settings.paperSize} 
-                      onValueChange={(v: PaperSize) => setSettings({...settings, paperSize: v})}
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="A4">A4 (210 x 297 mm)</SelectItem>
-                        <SelectItem value="A3">A3 (297 x 420 mm)</SelectItem>
-                        <SelectItem value="B5">B5 (176 x 250 mm)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>용지 방향</Label>
-                    <Select 
-                      value={settings.orientation} 
-                      onValueChange={(v: Orientation) => setSettings({...settings, orientation: v})}
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="portrait">세로 (Portrait)</SelectItem>
-                        <SelectItem value="landscape">가로 (Landscape)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>테마 선택</Label>
-                    <Select 
-                      value={settings.theme} 
-                      onValueChange={(v: Theme) => setSettings({...settings, theme: v})}
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="classic">클래식 (기본)</SelectItem>
-                        <SelectItem value="modern">모던 (블루 포인트)</SelectItem>
-                        <SelectItem value="minimal">미니멀 (흑백)</SelectItem>
-                        <SelectItem value="bold">볼드 (강조)</SelectItem>
-                        <SelectItem value="blue">블루 배경</SelectItem>
-                        <SelectItem value="dark">다크 모드</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>폰트 선택</Label>
-                    <Select 
-                      value={settings.fontFamily} 
-                      onValueChange={(v: FontFamily) => setSettings({...settings, fontFamily: v})}
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="nanum-gothic">나눔고딕</SelectItem>
-                        <SelectItem value="nanum-myeongjo">나눔명조</SelectItem>
-                        <SelectItem value="system">시스템 기본</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <CardContent className="px-3 pb-3 space-y-1">
+                  <Select 
+                    value={selectedTemplate.id} 
+                    onValueChange={(v) => {
+                      const template = QUOTATION_TEMPLATES.find(t => t.id === v);
+                      if (template) {
+                        setSelectedTemplate(template);
+                        if (template.defaultSpecialTerms) {
+                          setData(prev => ({ ...prev, remarks: template.defaultSpecialTerms || '' }));
+                        }
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="양식을 선택하세요" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {QUOTATION_TEMPLATES.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500 mt-1">{selectedTemplate.description}</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2 pt-3 px-3">
+                  <CardTitle className="text-sm">스타일 & 레이아웃</CardTitle>
+                </CardHeader>
+                <CardContent className="px-3 pb-3 space-y-2">
+                  {/* 2열 그리드 */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">용지</Label>
+                      <Select value={settings.paperSize} onValueChange={(v: PaperSize) => setSettings({...settings, paperSize: v})}>
+                        <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="A4">A4</SelectItem>
+                          <SelectItem value="A3">A3</SelectItem>
+                          <SelectItem value="B5">B5</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">방향</Label>
+                      <Select value={settings.orientation} onValueChange={(v: Orientation) => setSettings({...settings, orientation: v})}>
+                        <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="portrait">세로</SelectItem>
+                          <SelectItem value="landscape">가로</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">테마</Label>
+                      <Select value={settings.theme} onValueChange={(v: Theme) => setSettings({...settings, theme: v})}>
+                        <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="classic">클래식</SelectItem>
+                          <SelectItem value="modern">모던</SelectItem>
+                          <SelectItem value="minimal">미니멀</SelectItem>
+                          <SelectItem value="bold">볼드</SelectItem>
+                          <SelectItem value="blue">블루</SelectItem>
+                          <SelectItem value="dark">다크</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">폰트</Label>
+                      <Select value={settings.fontFamily} onValueChange={(v: FontFamily) => setSettings({...settings, fontFamily: v})}>
+                        <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="nanum-gothic">나눔고딕</SelectItem>
+                          <SelectItem value="nanum-myeongjo">나눔명조</SelectItem>
+                          <SelectItem value="system">시스템</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">옵션</CardTitle>
+                <CardHeader className="pb-2 pt-3 px-3">
+                  <CardTitle className="text-sm">옵션</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="px-3 pb-3 space-y-2">
                   <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="vat" 
-                      checked={!data.vatIncluded}
-                      onCheckedChange={(c) => setData({...data, vatIncluded: !c})}
-                    />
-                    <Label htmlFor="vat">부가세 별도 단가 적용</Label>
+                    <Checkbox id="vat" checked={!data.vatIncluded} onCheckedChange={(c) => setData({...data, vatIncluded: !c})} />
+                    <Label htmlFor="vat" className="text-xs">부가세 별도</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="page-num" 
-                      checked={settings.showPageNumbers}
-                      onCheckedChange={(c) => setSettings({...settings, showPageNumbers: !!c})}
-                    />
-                    <Label htmlFor="page-num">페이지 번호 표시</Label>
+                    <Checkbox id="page-num" checked={settings.showPageNumbers} onCheckedChange={(c) => setSettings({...settings, showPageNumbers: !!c})} />
+                    <Label htmlFor="page-num" className="text-xs">페이지 번호</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="special-terms" 
-                      checked={settings.showSpecialTerms}
-                      onCheckedChange={(c) => setSettings({...settings, showSpecialTerms: !!c})}
-                    />
-                    <Label htmlFor="special-terms">특수조건 표시</Label>
+                    <Checkbox id="special-terms" checked={settings.showSpecialTerms} onCheckedChange={(c) => setSettings({...settings, showSpecialTerms: !!c})} />
+                    <Label htmlFor="special-terms" className="text-xs">특수조건 표시</Label>
                   </div>
-                  <div className="space-y-2 pt-2">
-                    <Label className="text-xs text-gray-600">통화 단위</Label>
-                    <Select 
-                      value={settings.currency} 
-                      onValueChange={(v: Currency) => setSettings({...settings, currency: v})}
-                    >
-                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                  <div className="pt-1">
+                    <Label className="text-xs text-gray-500">통화</Label>
+                    <Select value={settings.currency} onValueChange={(v: Currency) => setSettings({...settings, currency: v})}>
+                      <SelectTrigger className="h-7 mt-1"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="원">원 (KRW)</SelectItem>
                         <SelectItem value="천원">천원</SelectItem>
@@ -749,48 +865,42 @@ export function QuotationPage() {
               </Card>
 
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">숫자 계산 설정</CardTitle>
+                <CardHeader className="pb-2 pt-3 px-3">
+                  <CardTitle className="text-sm">숫자 계산</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs text-gray-600">단가 소수점 자리</Label>
-                    <Select 
-                      value={String(calcSettings.priceDecimalPlaces)} 
-                      onValueChange={(v) => setCalcSettings({...calcSettings, priceDecimalPlaces: Number(v) as 0 | 1 | 2})}
-                    >
-                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="0">정수 (소수점 없음)</SelectItem>
-                        <SelectItem value="1">소수점 1자리</SelectItem>
-                        <SelectItem value="2">소수점 2자리</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <CardContent className="px-3 pb-3 space-y-2">
+                  {/* 단가 설정 - 2열 그리드 */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-gray-500">단가 소수점</Label>
+                      <Select value={String(calcSettings.priceDecimalPlaces)} onValueChange={(v) => setCalcSettings({...calcSettings, priceDecimalPlaces: Number(v) as 0 | 1 | 2})}>
+                        <SelectTrigger className="h-7"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">정수</SelectItem>
+                          <SelectItem value="1">1자리</SelectItem>
+                          <SelectItem value="2">2자리</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-gray-500">단가 반올림</Label>
+                      <Select value={calcSettings.priceRounding} onValueChange={(v: 'round' | 'floor' | 'ceil') => setCalcSettings({...calcSettings, priceRounding: v})}>
+                        <SelectTrigger className="h-7"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="round">반올림</SelectItem>
+                          <SelectItem value="floor">내림</SelectItem>
+                          <SelectItem value="ceil">올림</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs text-gray-600">단가 반올림 방식</Label>
-                    <Select 
-                      value={calcSettings.priceRounding} 
-                      onValueChange={(v: 'round' | 'floor' | 'ceil') => setCalcSettings({...calcSettings, priceRounding: v})}
-                    >
-                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-500">부가세 반올림</Label>
+                    <Select value={calcSettings.vatRounding} onValueChange={(v: 'round' | 'floor' | 'ceil') => setCalcSettings({...calcSettings, vatRounding: v})}>
+                      <SelectTrigger className="h-7"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="round">반올림</SelectItem>
-                        <SelectItem value="floor">내림 (버림)</SelectItem>
-                        <SelectItem value="ceil">올림</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs text-gray-600">부가세 반올림 방식</Label>
-                    <Select 
-                      value={calcSettings.vatRounding} 
-                      onValueChange={(v: 'round' | 'floor' | 'ceil') => setCalcSettings({...calcSettings, vatRounding: v})}
-                    >
-                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="round">반올림</SelectItem>
-                        <SelectItem value="floor">내림 (버림)</SelectItem>
+                        <SelectItem value="floor">내림</SelectItem>
                         <SelectItem value="ceil">올림</SelectItem>
                       </SelectContent>
                     </Select>
@@ -839,7 +949,7 @@ export function QuotationPage() {
                           {bannerSettings.bannerImage && bannerSettings.position === 'left' && (
                             <img src={bannerSettings.bannerImage} alt="회사 배너" className="max-h-10 object-contain" />
                           )}
-                          <h1 className="text-3xl font-bold tracking-widest">견 적 서</h1>
+                          <h1 className="text-3xl font-bold tracking-widest">{selectedTemplate.title}</h1>
                           {bannerSettings.bannerImage && bannerSettings.position === 'right' && (
                             <img src={bannerSettings.bannerImage} alt="회사 배너" className="max-h-10 object-contain" />
                           )}
@@ -935,73 +1045,44 @@ export function QuotationPage() {
                   )}
 
                   {/* [Section] Line Items & Calculation */}
-                  {/* 컬럼 너비 드래그로 조절 가능, 삭제/추가 버튼은 테이블 밖에 표시 */}
+                  {/* 선택된 양식에 따라 동적으로 테이블 렌더링 */}
                   <div className="relative overflow-visible">
                     {/* 통화 단위 표시 - 테이블 우측 상단 */}
                     {page.isFirst && (
                       <div className="text-right text-xs text-gray-500 mb-1">(단위: {settings.currency})</div>
                     )}
-                    {/* 메인 테이블 - 100% 너비 */}
-                    <table className="w-full border-collapse border border-black mb-2 text-sm table-fixed">
+                    {/* 메인 테이블 - 동적 컬럼 */}
+                    <table className="w-full border-collapse border border-black mb-2 text-sm table-fixed" style={{ wordBreak: 'break-word' }}>
                         <colgroup>
-                          <col style={{ width: `${colWidths.no}%` }} />
-                          <col style={{ width: `${colWidths.name}%` }} />
-                          <col style={{ width: `${colWidths.spec}%` }} />
-                          <col style={{ width: `${colWidths.unit}%` }} />
-                          <col style={{ width: `${colWidths.qty}%` }} />
-                          <col style={{ width: `${colWidths.price}%` }} />
-                          <col style={{ width: `${colWidths.amount}%` }} />
-                          <col style={{ width: `${colWidths.note}%` }} />
+                          {selectedTemplate.columns.map((col) => (
+                            <col key={col.key} style={{ width: `${colWidths[col.key] || col.width}%` }} />
+                          ))}
                         </colgroup>
                         {/* 첫 페이지에만 테이블 헤더 표시 */}
                         {page.isFirst && (
                           <thead>
                             <tr className="bg-gray-100">
-                              <th className="border border-black p-1.5 text-center relative">
-                                No
-                                <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                                  onMouseDown={(e) => handleColumnResize('no', e.clientX, colWidths.no)} />
-                              </th>
-                              <th className="border border-black p-1.5 text-center relative">
-                                품명
-                                <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                                  onMouseDown={(e) => handleColumnResize('name', e.clientX, colWidths.name)} />
-                              </th>
-                              <th className="border border-black p-1.5 text-center relative">
-                                규격
-                                <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                                  onMouseDown={(e) => handleColumnResize('spec', e.clientX, colWidths.spec)} />
-                              </th>
-                              <th className="border border-black p-1.5 text-center relative">
-                                단위
-                                <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                                  onMouseDown={(e) => handleColumnResize('unit', e.clientX, colWidths.unit)} />
-                              </th>
-                              <th className="border border-black p-1.5 text-center relative">
-                                수량
-                                <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                                  onMouseDown={(e) => handleColumnResize('qty', e.clientX, colWidths.qty)} />
-                              </th>
-                              <th className="border border-black p-1.5 text-center relative">
-                                단가
-                                <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                                  onMouseDown={(e) => handleColumnResize('price', e.clientX, colWidths.price)} />
-                              </th>
-                              <th className="border border-black p-1.5 text-center relative">
-                                공급가액
-                                <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 print:hidden"
-                                  onMouseDown={(e) => handleColumnResize('amount', e.clientX, colWidths.amount)} />
-                              </th>
-                              <th className="border border-black p-1.5 text-center">비고</th>
+                              {selectedTemplate.columns.map((col, idx) => (
+                                <th key={col.key} className="border border-black p-1.5 text-center relative">
+                                  {col.label}
+                                  {idx < selectedTemplate.columns.length - 1 && (
+                                    <div 
+                                      className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400 print:hidden"
+                                      onMouseDown={(e) => handleColumnResize(col.key, e.clientX, colWidths[col.key] || col.width)}
+                                    />
+                                  )}
+                                </th>
+                              ))}
                             </tr>
                           </thead>
                         )}
                         <tbody>
                           {page.items.map((row) => {
+                            const colCount = selectedTemplate.columns.length;
                             if (row.type === 'subtotal') {
                               return (
                                 <tr key="subtotal" className="bg-gray-50">
-                                  <td colSpan={6} className="border border-black p-2 text-center font-bold">소 계</td>
+                                  <td colSpan={colCount - 2} className="border border-black p-2 text-center font-bold">소 계</td>
                                   <td colSpan={2} className="border border-black p-2 text-right font-bold">{data.subtotal.toLocaleString()} {settings.currency}</td>
                                 </tr>
                               );
@@ -1009,7 +1090,7 @@ export function QuotationPage() {
                             if (row.type === 'vat') {
                               return (
                                 <tr key="vat" className="bg-gray-50">
-                                  <td colSpan={6} className="border border-black p-2 text-center font-bold">부 가 세</td>
+                                  <td colSpan={colCount - 2} className="border border-black p-2 text-center font-bold">부 가 세</td>
                                   <td colSpan={2} className="border border-black p-2 text-right font-bold">{data.vat.toLocaleString()} {settings.currency}</td>
                                 </tr>
                               );
@@ -1017,7 +1098,7 @@ export function QuotationPage() {
                             if (row.type === 'total') {
                               return (
                                 <tr key="total" className="bg-gray-100">
-                                  <td colSpan={6} className="border border-black p-2 text-center font-bold text-lg">총 합 계</td>
+                                  <td colSpan={colCount - 2} className="border border-black p-2 text-center font-bold text-lg">총 합 계</td>
                                   <td colSpan={2} className="border border-black p-2 text-right font-bold text-lg text-blue-600">{data.total.toLocaleString()} {settings.currency}</td>
                                 </tr>
                               );
@@ -1026,84 +1107,111 @@ export function QuotationPage() {
                             const item = row.data!;
                             const itemIndex = data.items.findIndex(i => i.id === item.id);
                             
+                            // 동적 셀 렌더링 함수
+                            const renderCell = (col: TemplateColumn, isLast: boolean) => {
+                              const cellClass = "border border-black p-0" + (isLast ? " relative" : "");
+                              const alignClass = col.align === 'center' ? 'center' : col.align === 'right' ? 'right' : 'left';
+                              
+                              switch (col.key) {
+                                case 'no':
+                                  return (
+                                    <td key={col.key} className="border border-black p-1 text-center bg-gray-50">
+                                      {itemIndex + 1}
+                                    </td>
+                                  );
+                                case 'name':
+                                  return (
+                                    <td key={col.key} className={cellClass}>
+                                      <EditableInput value={item.name} onChange={(v) => handleItemChange(item.id, 'name', v)} align={alignClass} multiline className="h-full px-2" />
+                                    </td>
+                                  );
+                                case 'spec':
+                                  return (
+                                    <td key={col.key} className={cellClass}>
+                                      <EditableInput value={item.spec} onChange={(v) => handleItemChange(item.id, 'spec', v)} align={alignClass} multiline className="h-full px-1" />
+                                    </td>
+                                  );
+                                case 'unit':
+                                  return (
+                                    <td key={col.key} className={cellClass}>
+                                      <EditableInput value={item.unit} onChange={(v) => handleItemChange(item.id, 'unit', v)} align="center" className="h-full px-1" />
+                                    </td>
+                                  );
+                                case 'quantity':
+                                  return (
+                                    <td key={col.key} className={cellClass}>
+                                      <EditableInput value={formatNumber(item.quantity)} onChange={(v) => handleItemChange(item.id, 'quantity', parseNumber(v))} align="center" className="h-full px-2" />
+                                    </td>
+                                  );
+                                case 'unitPrice':
+                                  return (
+                                    <td key={col.key} className={cellClass}>
+                                      <NumberInput value={item.unitPrice} onChange={(v) => handleItemChange(item.id, 'unitPrice', v)} decimalPlaces={calcSettings.priceDecimalPlaces} align="right" className="h-full px-2" />
+                                    </td>
+                                  );
+                                case 'amount':
+                                  return (
+                                    <td key={col.key} className="border border-black p-1 text-right font-medium bg-gray-50/50 relative">
+                                      {item.amount.toLocaleString()}
+                                      {isLast && (
+                                        <div className="absolute left-full top-0 bottom-0 flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity print:hidden" data-html2canvas-ignore>
+                                          <Button variant="ghost" size="icon" className="h-6 w-6 text-blue-500 hover:text-blue-600 hover:bg-blue-50" onClick={() => insertItemAfter(itemIndex)} title="아래에 항목 추가">
+                                            <Plus className="w-3 h-3" />
+                                          </Button>
+                                          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => removeItem(item.id)} title="항목 삭제">
+                                            <Trash2 className="w-3 h-3" />
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </td>
+                                  );
+                                case 'note':
+                                  return (
+                                    <td key={col.key} className={cellClass}>
+                                      <EditableInput value={item.note} onChange={(v) => handleItemChange(item.id, 'note', v)} align="center" multiline className="h-full px-2" />
+                                      {isLast && (
+                                        <div className="absolute left-full top-0 bottom-0 flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity print:hidden" data-html2canvas-ignore>
+                                          <Button variant="ghost" size="icon" className="h-6 w-6 text-blue-500 hover:text-blue-600 hover:bg-blue-50" onClick={() => insertItemAfter(itemIndex)} title="아래에 항목 추가">
+                                            <Plus className="w-3 h-3" />
+                                          </Button>
+                                          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => removeItem(item.id)} title="항목 삭제">
+                                            <Trash2 className="w-3 h-3" />
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </td>
+                                  );
+                                // 건설용 추가 컬럼들
+                                case 'materialCost':
+                                case 'laborCost':
+                                case 'expense':
+                                  return (
+                                    <td key={col.key} className={cellClass}>
+                                      <NumberInput value={0} onChange={() => {}} decimalPlaces={0} align="right" className="h-full px-2" />
+                                    </td>
+                                  );
+                                default:
+                                  return (
+                                    <td key={col.key} className={cellClass}>
+                                      <EditableInput value="" onChange={() => {}} align={alignClass} className="h-full px-2" />
+                                      {isLast && (
+                                        <div className="absolute left-full top-0 bottom-0 flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity print:hidden" data-html2canvas-ignore>
+                                          <Button variant="ghost" size="icon" className="h-6 w-6 text-blue-500 hover:text-blue-600 hover:bg-blue-50" onClick={() => insertItemAfter(itemIndex)} title="아래에 항목 추가">
+                                            <Plus className="w-3 h-3" />
+                                          </Button>
+                                          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => removeItem(item.id)} title="항목 삭제">
+                                            <Trash2 className="w-3 h-3" />
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </td>
+                                  );
+                              }
+                            };
+                            
                             return (
                               <tr key={item.id} className="group hover:bg-blue-50/30 relative">
-                                <td className="border border-black p-1 text-center bg-gray-50">
-                                  {itemIndex + 1}
-                                </td>
-                                <td className="border border-black p-0">
-                                  <EditableInput 
-                                    value={item.name} 
-                                    onChange={(v) => handleItemChange(item.id, 'name', v)}
-                                    align="left"
-                                    className="h-full px-2"
-                                  />
-                                </td>
-                                <td className="border border-black p-0">
-                                  <EditableInput 
-                                    value={item.spec} 
-                                    onChange={(v) => handleItemChange(item.id, 'spec', v)}
-                                    align="left"
-                                    className="h-full px-1"
-                                  />
-                                </td>
-                                <td className="border border-black p-0">
-                                  <EditableInput 
-                                    value={item.unit} 
-                                    onChange={(v) => handleItemChange(item.id, 'unit', v)}
-                                    align="center"
-                                    className="h-full px-1"
-                                  />
-                                </td>
-                                <td className="border border-black p-0">
-                                  <EditableInput 
-                                    value={formatNumber(item.quantity)} 
-                                    onChange={(v) => handleItemChange(item.id, 'quantity', parseNumber(v))}
-                                    align="center"
-                                    className="h-full px-2"
-                                  />
-                                </td>
-                                <td className="border border-black p-0">
-                                  <NumberInput 
-                                    value={item.unitPrice} 
-                                    onChange={(v) => handleItemChange(item.id, 'unitPrice', v)}
-                                    decimalPlaces={calcSettings.priceDecimalPlaces}
-                                    align="right"
-                                    className="h-full px-2"
-                                  />
-                                </td>
-                                <td className="border border-black p-1 text-right font-medium bg-gray-50/50">
-                                  {item.amount.toLocaleString()}
-                                </td>
-                                <td className="border border-black p-0 relative">
-                                  <EditableInput 
-                                    value={item.note} 
-                                    onChange={(v) => handleItemChange(item.id, 'note', v)}
-                                    align="center"
-                                    className="h-full px-2"
-                                  />
-                                  {/* 행 hover 시 나타나는 액션 버튼 */}
-                                  <div className="absolute left-full top-0 bottom-0 flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity print:hidden" data-html2canvas-ignore>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
-                                      onClick={() => insertItemAfter(itemIndex)}
-                                      title="아래에 항목 추가"
-                                    >
-                                      <Plus className="w-3 h-3" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6 text-red-500 hover:text-red-600 hover:bg-red-50"
-                                      onClick={() => removeItem(item.id)}
-                                      title="항목 삭제"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-                                </td>
+                                {selectedTemplate.columns.map((col, idx) => renderCell(col, idx === selectedTemplate.columns.length - 1))}
                               </tr>
                             );
                           })}
