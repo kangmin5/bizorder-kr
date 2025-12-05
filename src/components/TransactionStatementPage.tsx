@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   Printer, 
   Plus, 
@@ -7,6 +8,8 @@ import {
   Download,
   Settings2,
   PanelLeft,
+  Save,
+  FolderOpen,
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -21,8 +24,8 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Checkbox } from './ui/checkbox';
 import { cn } from '@/lib/utils';
 
-import { usePageSplitter } from '../hooks/useDocumentPagination';
 import { useSettingsStore } from '../stores/useSettingsStore';
+import { useDocumentStore } from '../stores/useDocumentStore';
 
 // --- Types ---
 
@@ -100,18 +103,6 @@ const PAPER_DIMENSIONS: Record<PaperSize, { width: number; height: number }> = {
   A4: { width: 210, height: 297 },
   A3: { width: 297, height: 420 },
   B5: { width: 176, height: 250 },
-};
-
-const SECTION_HEIGHTS = {
-  HEADER_FIRST: 60,
-  HEADER_NEXT: 10,
-  TABLE_HEADER: 10,
-  ROW: 8,
-  SUMMARY_ROW: 8,
-  REMARKS_BASE: 25,
-  REMARKS_LINE: 5,
-  BUTTON: 10,
-  FOOTER: 10
 };
 
 // --- Helper Components ---
@@ -270,7 +261,21 @@ const EditableTextarea = ({
 // --- Main Component ---
 
 export function TransactionStatementPage() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const documentId = searchParams.get('id');
+  
   const { companyInfo, userInfo, bannerSettings } = useSettingsStore();
+  
+  // 문서 저장 스토어
+  const { 
+    currentDocumentId,
+    isModified,
+    saveDocument, 
+    loadDocument,
+    setCurrentDocument,
+    setModified
+  } = useDocumentStore();
 
   const [isLoading, setIsLoading] = useState(false);
   const [zoom, setZoom] = useState(100);
@@ -367,6 +372,53 @@ export function TransactionStatementPage() {
   }));
 
   const printRef = useRef<HTMLDivElement>(null);
+
+  // 문서 불러오기 (URL에 id가 있으면)
+  useEffect(() => {
+    if (documentId) {
+      loadDocument(documentId).then(doc => {
+        if (doc && doc.data) {
+          setData(doc.data);
+        }
+      });
+    } else {
+      setCurrentDocument(null);
+    }
+  }, [documentId, loadDocument, setCurrentDocument]);
+
+  // 데이터 변경 시 수정됨 표시
+  useEffect(() => {
+    if (currentDocumentId) {
+      setModified(true);
+    }
+  }, [data]);
+
+  // 문서 저장 핸들러
+  const handleSaveDocument = async () => {
+    const title = data.client.name 
+      ? `${data.client.name} 거래명세서` 
+      : `거래명세서 ${data.statementNumber}`;
+    
+    try {
+      const docId = await saveDocument({
+        id: currentDocumentId || undefined,
+        type: 'transaction_statement',
+        title,
+        clientName: data.client.name || '(미지정)',
+        total: data.total,
+        itemCount: data.items.length,
+        data: data,
+      });
+      
+      if (!currentDocumentId) {
+        navigate(`/transaction-statement?id=${docId}`, { replace: true });
+      }
+      
+      alert('문서가 저장되었습니다.');
+    } catch (error) {
+      alert('저장에 실패했습니다.');
+    }
+  };
 
   useEffect(() => {
     calculateTotals();
@@ -519,20 +571,7 @@ export function TransactionStatementPage() {
     }
   };
 
-  const pages = usePageSplitter(
-    [
-      ...data.items.map(item => ({ type: 'item' as const, data: item })),
-      { type: 'subtotal' as const },
-      { type: 'vat' as const },
-      { type: 'total' as const }
-    ],
-    data.remarks,
-    {
-      paperSize: settings.paperSize,
-      margins: settings.margins,
-      sectionHeights: SECTION_HEIGHTS
-    }
-  );
+  // 단순화: 페이지 분할 없이 단일 연속 문서로 렌더링
 
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col">
@@ -541,26 +580,19 @@ export function TransactionStatementPage() {
           <Button variant="outline" size="icon" onClick={toggleSidebar}>
             <PanelLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-xl font-bold">거래명세서 작성</h1>
+          <h1 className="text-xl font-bold">
+            거래명세서 작성
+            {isModified && <span className="ml-2 text-sm text-orange-500">●</span>}
+          </h1>
           <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1 text-sm">
             <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setZoom(Math.max(50, zoom - 10))}>-</Button>
             <span className="w-12 text-center">{zoom}%</span>
             <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setZoom(Math.min(200, zoom + 10))}>+</Button>
           </div>
-          {pages.length > 1 && (
-            <div className="flex items-center gap-1 bg-green-50 rounded-lg px-2 py-1 text-sm">
-              <span className="text-gray-500 text-xs mr-1">페이지:</span>
-              {pages.map((_, idx) => (
-                <Button key={idx} variant={idx === 0 ? "default" : "outline"} size="sm" className="h-6 w-6 p-0 text-xs"
-                  onClick={() => document.getElementById(`ts-page-${idx}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-                  {idx + 1}
-                </Button>
-              ))}
-              <span className="text-gray-400 text-xs ml-1">/ {pages.length}</span>
-            </div>
-          )}
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate('/documents')}><FolderOpen className="w-4 h-4 mr-2" /> 문서함</Button>
+          <Button variant="outline" onClick={handleSaveDocument}><Save className="w-4 h-4 mr-2" /> 저장</Button>
           <Button variant="outline" onClick={() => window.print()}><Printer className="w-4 h-4 mr-2" /> 인쇄</Button>
           <Button variant="outline" onClick={handleExportExcel}><FileSpreadsheet className="w-4 h-4 mr-2" /> 엑셀</Button>
           <Button onClick={handleExportPDF} disabled={isLoading}><Download className="w-4 h-4 mr-2" /> {isLoading ? '생성 중...' : 'PDF'}</Button>
@@ -701,250 +733,177 @@ export function TransactionStatementPage() {
 
         <ResizablePanel defaultSize={75} className="bg-slate-100">
           <div className="h-full overflow-auto">
-            <div className="flex flex-col items-center p-8 min-w-[800px] gap-8" ref={printRef}>
-              {pages.map((page, pageIndex) => (
-                <div key={pageIndex} id={`ts-page-${pageIndex}`}
-                  className={cn("shadow-lg transition-all duration-300 p-[10mm] box-border relative bg-white flex flex-col page-break", renderThemeStyles())}
-                  style={{ width: `${getPaperDimensions().width}mm`, height: `${getPaperDimensions().height}mm`, transform: `scale(${zoom / 100})`, transformOrigin: 'top center', marginBottom: '2rem' }}>
-                  
-                  {page.isFirst && (
-                    <>
-                      {bannerSettings.bannerImage && bannerSettings.position === 'top' && (
-                        <div className="-mt-[10mm] -mx-[10mm] mb-2">
-                          <img src={bannerSettings.bannerImage} alt="회사 배너" className="w-[190mm] max-h-[50mm] mx-auto" />
-                        </div>
-                      )}
+            <div className="flex flex-col items-center p-8 min-w-[800px]" ref={printRef}>
+              {/* 단일 연속 문서 */}
+              <div 
+                className={cn("shadow-lg transition-all duration-300 p-[10mm] box-border relative bg-white flex flex-col", renderThemeStyles())}
+                style={{ width: `${getPaperDimensions().width}mm`, minHeight: `${getPaperDimensions().height}mm`, transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
+              >
+                {/* 배너 이미지 - 상단 (2800x300px 비율) */}
+                {bannerSettings.bannerImage && bannerSettings.position === 'top' && (
+                  <div className="-mt-[10mm] -mx-[10mm] mb-4">
+                    <img src={bannerSettings.bannerImage} alt="회사 배너" className="w-full h-auto object-cover" style={{ aspectRatio: '2800/300' }} />
+                  </div>
+                )}
 
-                      <div className="flex justify-between items-center border-b-2 border-black pb-2 mb-3">
-                        <div className="flex items-center gap-3">
-                          {bannerSettings.bannerImage && bannerSettings.position === 'left' && (
-                            <img src={bannerSettings.bannerImage} alt="회사 배너" className="max-h-10 object-contain" />
-                          )}
-                          <h1 className="text-3xl font-bold tracking-widest">거래명세서</h1>
-                          {bannerSettings.bannerImage && bannerSettings.position === 'right' && (
-                            <img src={bannerSettings.bannerImage} alt="회사 배너" className="max-h-10 object-contain" />
-                          )}
-                        </div>
-                        <p className="text-xl font-bold text-green-600">
-                          {data.total.toLocaleString()} {settings.currency} <span className="text-sm text-black font-normal">(VAT 포함)</span>
-                        </p>
-                      </div>
-
-                      <div className="flex gap-4 mb-3 text-xs">
-                        <div className="flex-1 space-y-2">
-                          <div className="grid grid-cols-[70px_1fr_70px_1fr] gap-x-2 gap-y-1 items-center">
-                            <span className="text-gray-500">거래번호</span>
-                            <EditableInput value={data.statementNumber} onChange={(v) => setData({...data, statementNumber: v})} className="font-medium" />
-                            <span className="text-gray-500">거래일자</span>
-                            <EditableInput type="date" value={data.date} onChange={(v) => setData({...data, date: v})} />
-                            <span className="text-gray-500">결제조건</span>
-                            <EditableInput value={data.paymentTerms} onChange={(v) => setData({...data, paymentTerms: v})} placeholder="결제조건" />
-                            <span className="text-gray-500"></span>
-                            <span></span>
-                          </div>
-                          
-                          <div className="border-t pt-2">
-                            <div className="flex items-baseline gap-2 mb-1">
-                              <span className="text-gray-500 w-14">수신</span>
-                              <EditableInput value={data.client.name} onChange={(v) => setData({...data, client: {...data.client, name: v}})} placeholder="거래처 (회사명)" className="text-sm font-bold flex-1" />
-                              <span className="text-sm">귀하</span>
-                            </div>
-                            <div className="grid grid-cols-[70px_1fr_70px_1fr] gap-x-2 gap-y-1 items-center">
-                              <span className="text-gray-500">담당자</span>
-                              <EditableInput value={data.client.ownerName} onChange={(v) => setData({...data, client: {...data.client, ownerName: v}})} placeholder="담당자" />
-                              <span className="text-gray-500">부서</span>
-                              <EditableInput value={data.client.department || ''} onChange={(v) => setData({...data, client: {...data.client, department: v}})} placeholder="부서/팀" />
-                              <span className="text-gray-500">직책</span>
-                              <EditableInput value={data.client.position || ''} onChange={(v) => setData({...data, client: {...data.client, position: v}})} placeholder="직책/직위" />
-                              <span className="text-gray-500">연락처</span>
-                              <EditableInput value={data.client.phone} onChange={(v) => setData({...data, client: {...data.client, phone: v}})} placeholder="연락처" />
-                              <span className="text-gray-500">이메일</span>
-                              <EditableInput value={data.client.email} onChange={(v) => setData({...data, client: {...data.client, email: v}})} placeholder="이메일" />
-                              <span className="text-gray-500"></span>
-                              <span></span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="w-[200px] border border-gray-300 rounded p-2 text-xs flex-shrink-0">
-                          <div className="flex items-center justify-between border-b pb-1 mb-1">
-                            <span className="font-bold">공급자</span>
-                            {bannerSettings.stampImage && <img src={bannerSettings.stampImage} alt="직인" className="w-8 h-8 object-contain" />}
-                          </div>
-                          <div className="grid grid-cols-[50px_1fr] gap-x-2 gap-y-0.5 items-center">
-                            <span className="text-gray-400">상호</span>
-                            <EditableInput value={data.supplier.name} onChange={(v) => setData({...data, supplier: {...data.supplier, name: v}})} />
-                            <span className="text-gray-400 whitespace-nowrap">사업자번호</span>
-                            <EditableInput value={formatBusinessNumber(data.supplier.registrationNumber)} onChange={(v) => setData({...data, supplier: {...data.supplier, registrationNumber: v.replace(/-/g, '')}})} placeholder="000-00-00000" />
-                            <span className="text-gray-400">대표자</span>
-                            <EditableInput value={data.supplier.ownerName} onChange={(v) => setData({...data, supplier: {...data.supplier, ownerName: v}})} />
-                            <span className="text-gray-400">연락처</span>
-                            <EditableInput value={data.supplier.phone} onChange={(v) => setData({...data, supplier: {...data.supplier, phone: v}})} />
-                          </div>
-                          {(userInfo.name || userInfo.mobile || userInfo.email) && (
-                            <div className="border-t mt-1 pt-1 text-gray-600 text-xs">
-                              <div className="grid grid-cols-[50px_1fr] gap-x-2 gap-y-0.5 items-center">
-                                <span className="text-gray-400">담당</span>
-                                <span>{userInfo.name}{userInfo.position && ` (${userInfo.position})`}</span>
-                                {userInfo.mobile && <><span className="text-gray-400">연락처</span><span>{userInfo.mobile}</span></>}
-                                {userInfo.email && <><span className="text-gray-400">이메일</span><span>{userInfo.email}</span></>}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-gray-500 mb-2">아래와 같이 공급합니다.</p>
-                    </>
-                  )}
-
-                  {!page.isFirst && <div style={{ height: `${SECTION_HEIGHTS.HEADER_NEXT}mm` }} />}
-
-                  <div className="relative overflow-visible">
-                    {page.isFirst && (
-                      <div className="text-right text-xs text-gray-500 mb-1">(단위: {settings.currency})</div>
+                {/* 제목 + 총금액 */}
+                <div className="flex justify-between items-center border-b-2 border-black pb-2 mb-3">
+                  <div className="flex items-center gap-3">
+                    {bannerSettings.bannerImage && bannerSettings.position === 'left' && (
+                      <img src={bannerSettings.bannerImage} alt="회사 배너" className="max-h-10 object-contain" />
                     )}
-                    <table className="w-full border-collapse border border-black mb-2 text-sm table-fixed" style={{ wordBreak: 'break-word' }}>
-                      <colgroup>
-                        <col style={{ width: `${colWidths.no}%` }} />
-                        <col style={{ width: `${colWidths.name}%` }} />
-                        <col style={{ width: `${colWidths.spec}%` }} />
-                        <col style={{ width: `${colWidths.unit}%` }} />
-                        <col style={{ width: `${colWidths.qty}%` }} />
-                        <col style={{ width: `${colWidths.price}%` }} />
-                        <col style={{ width: `${colWidths.amount}%` }} />
-                        <col style={{ width: `${colWidths.note}%` }} />
-                      </colgroup>
-                      {page.isFirst && (
-                        <thead>
-                          <tr className="bg-gray-100">
-                            <th className="border border-black p-1.5 text-center relative">
-                              No
-                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-400 print:hidden"
-                                onMouseDown={(e) => handleColumnResize('no', e.clientX, colWidths.no)} />
-                            </th>
-                            <th className="border border-black p-1.5 text-center relative">
-                              품명
-                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-400 print:hidden"
-                                onMouseDown={(e) => handleColumnResize('name', e.clientX, colWidths.name)} />
-                            </th>
-                            <th className="border border-black p-1.5 text-center relative">
-                              규격
-                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-400 print:hidden"
-                                onMouseDown={(e) => handleColumnResize('spec', e.clientX, colWidths.spec)} />
-                            </th>
-                            <th className="border border-black p-1.5 text-center relative">
-                              단위
-                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-400 print:hidden"
-                                onMouseDown={(e) => handleColumnResize('unit', e.clientX, colWidths.unit)} />
-                            </th>
-                            <th className="border border-black p-1.5 text-center relative">
-                              수량
-                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-400 print:hidden"
-                                onMouseDown={(e) => handleColumnResize('qty', e.clientX, colWidths.qty)} />
-                            </th>
-                            <th className="border border-black p-1.5 text-center relative">
-                              단가
-                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-400 print:hidden"
-                                onMouseDown={(e) => handleColumnResize('price', e.clientX, colWidths.price)} />
-                            </th>
-                            <th className="border border-black p-1.5 text-center relative">
-                              공급가액
-                              <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-400 print:hidden"
-                                onMouseDown={(e) => handleColumnResize('amount', e.clientX, colWidths.amount)} />
-                            </th>
-                            <th className="border border-black p-1.5 text-center">비고</th>
-                          </tr>
-                        </thead>
-                      )}
-                      <tbody>
-                        {page.items.map((row) => {
-                          if (row.type === 'subtotal') {
-                            return (
-                              <tr key="subtotal" className="bg-gray-50">
-                                <td colSpan={6} className="border border-black p-2 text-center font-bold">소 계</td>
-                                <td colSpan={2} className="border border-black p-2 text-right font-bold">{data.subtotal.toLocaleString()} {settings.currency}</td>
-                              </tr>
-                            );
-                          }
-                          if (row.type === 'vat') {
-                            return (
-                              <tr key="vat" className="bg-gray-50">
-                                <td colSpan={6} className="border border-black p-2 text-center font-bold">부 가 세</td>
-                                <td colSpan={2} className="border border-black p-2 text-right font-bold">{data.vat.toLocaleString()} {settings.currency}</td>
-                              </tr>
-                            );
-                          }
-                          if (row.type === 'total') {
-                            return (
-                              <tr key="total" className="bg-gray-100">
-                                <td colSpan={6} className="border border-black p-2 text-center font-bold text-lg">총 합 계</td>
-                                <td colSpan={2} className="border border-black p-2 text-right font-bold text-lg text-green-600">{data.total.toLocaleString()} {settings.currency}</td>
-                              </tr>
-                            );
-                          }
-                          const item = row.data!;
-                          const itemIndex = data.items.findIndex(i => i.id === item.id);
-                          return (
-                            <tr key={item.id} className="group hover:bg-green-50/30 relative">
-                              <td className="border border-black p-1 text-center bg-gray-50">{itemIndex + 1}</td>
-                              <td className="border border-black p-0">
-                                <EditableInput value={item.name} onChange={(v) => handleItemChange(item.id, 'name', v)} align="left" multiline className="h-full px-2" />
-                              </td>
-                              <td className="border border-black p-0">
-                                <EditableInput value={item.spec} onChange={(v) => handleItemChange(item.id, 'spec', v)} align="left" multiline className="h-full px-1" />
-                              </td>
-                              <td className="border border-black p-0">
-                                <EditableInput value={item.unit} onChange={(v) => handleItemChange(item.id, 'unit', v)} align="center" className="h-full px-1" />
-                              </td>
-                              <td className="border border-black p-0">
-                                <EditableInput value={formatNumber(item.quantity)} onChange={(v) => handleItemChange(item.id, 'quantity', parseNumber(v))} align="center" className="h-full px-2" />
-                              </td>
-                              <td className="border border-black p-0">
-                                <NumberInput value={item.unitPrice} onChange={(v) => handleItemChange(item.id, 'unitPrice', v)} decimalPlaces={calcSettings.priceDecimalPlaces} align="right" className="h-full px-2" />
-                              </td>
-                              <td className="border border-black p-1 text-right font-medium bg-gray-50/50">{item.amount.toLocaleString()}</td>
-                              <td className="border border-black p-0 relative">
-                                <EditableInput value={item.note} onChange={(v) => handleItemChange(item.id, 'note', v)} align="center" multiline className="h-full px-2" />
-                                <div className="absolute left-full top-0 bottom-0 flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity print:hidden" data-html2canvas-ignore>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-green-500 hover:text-green-600 hover:bg-green-50" onClick={() => insertItemAfter(itemIndex)} title="아래에 항목 추가">
-                                    <Plus className="w-3 h-3" />
-                                  </Button>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => removeItem(item.id)} title="항목 삭제">
-                                    <Trash2 className="w-3 h-3" />
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                    <h1 className="text-3xl font-bold tracking-widest">거래명세서</h1>
+                    {bannerSettings.bannerImage && bannerSettings.position === 'right' && (
+                      <img src={bannerSettings.bannerImage} alt="회사 배너" className="max-h-10 object-contain" />
+                    )}
+                  </div>
+                  <p className="text-xl font-bold text-green-600">
+                    {data.total.toLocaleString()} {settings.currency} <span className="text-sm text-black font-normal">(VAT 포함)</span>
+                  </p>
+                </div>
+
+                {/* 메타정보 + 수신처 + 공급자 */}
+                <div className="flex gap-4 mb-3 text-xs">
+                  <div className="flex-1 space-y-2">
+                    <div className="grid grid-cols-[70px_1fr_70px_1fr] gap-x-2 gap-y-1 items-center">
+                      <span className="text-gray-500">거래번호</span>
+                      <EditableInput value={data.statementNumber} onChange={(v) => setData({...data, statementNumber: v})} className="font-medium" />
+                      <span className="text-gray-500">거래일자</span>
+                      <EditableInput type="date" value={data.date} onChange={(v) => setData({...data, date: v})} />
+                      <span className="text-gray-500">결제조건</span>
+                      <EditableInput value={data.paymentTerms} onChange={(v) => setData({...data, paymentTerms: v})} placeholder="결제조건" />
+                      <span className="text-gray-500"></span>
+                      <span></span>
+                    </div>
+                    
+                    <div className="border-t pt-2">
+                      <div className="flex items-baseline gap-2 mb-1">
+                        <span className="text-gray-500 w-14">수신</span>
+                        <EditableInput value={data.client.name} onChange={(v) => setData({...data, client: {...data.client, name: v}})} placeholder="거래처 (회사명)" className="text-sm font-bold flex-1" />
+                        <span className="text-sm">귀하</span>
+                      </div>
+                      <div className="grid grid-cols-[70px_1fr_70px_1fr] gap-x-2 gap-y-1 items-center">
+                        <span className="text-gray-500">담당자</span>
+                        <EditableInput value={data.client.ownerName} onChange={(v) => setData({...data, client: {...data.client, ownerName: v}})} placeholder="담당자" />
+                        <span className="text-gray-500">부서</span>
+                        <EditableInput value={data.client.department || ''} onChange={(v) => setData({...data, client: {...data.client, department: v}})} placeholder="부서/팀" />
+                        <span className="text-gray-500">직책</span>
+                        <EditableInput value={data.client.position || ''} onChange={(v) => setData({...data, client: {...data.client, position: v}})} placeholder="직책/직위" />
+                        <span className="text-gray-500">연락처</span>
+                        <EditableInput value={data.client.phone} onChange={(v) => setData({...data, client: {...data.client, phone: v}})} placeholder="연락처" />
+                        <span className="text-gray-500">이메일</span>
+                        <EditableInput value={data.client.email} onChange={(v) => setData({...data, client: {...data.client, email: v}})} placeholder="이메일" />
+                        <span className="text-gray-500"></span>
+                        <span></span>
+                      </div>
+                    </div>
                   </div>
 
-                  {page.isLast ? (
-                    <>
-                      {settings.showSpecialTerms && (
-                        <div className="text-sm space-y-4 pt-2 flex-shrink-0 mt-2">
-                          <div className="flex gap-4 items-start pt-2">
-                            <span className="font-bold w-20 text-gray-700 mt-1">특수조건</span>
-                            <EditableTextarea value={data.remarks} onChange={(v) => setData({...data, remarks: v})} rows={3} placeholder="특수조건을 입력하세요" className="flex-1 border border-gray-200 rounded p-2" />
-                          </div>
-                        </div>
-                      )}
-                      <div className="text-center text-gray-400 text-xs flex-shrink-0 mt-auto">
-                        Generated by BizOrder
-                        {settings.showPageNumbers && <span className="ml-2">({pageIndex + 1} / {pages.length})</span>}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="mt-auto text-center text-gray-400 text-sm border-t pt-4">
-                      (다음 페이지에 계속)
-                      {settings.showPageNumbers && <div className="text-xs mt-1">{pageIndex + 1} / {pages.length}</div>}
+                  <div className="w-[200px] border border-gray-300 rounded p-2 text-xs flex-shrink-0">
+                    <div className="flex items-center justify-between border-b pb-1 mb-1">
+                      <span className="font-bold">공급자</span>
+                      {bannerSettings.stampImage && <img src={bannerSettings.stampImage} alt="직인" className="w-8 h-8 object-contain" />}
                     </div>
-                  )}
+                    <div className="grid grid-cols-[50px_1fr] gap-x-2 gap-y-0.5 items-center">
+                      <span className="text-gray-400">상호</span>
+                      <EditableInput value={data.supplier.name} onChange={(v) => setData({...data, supplier: {...data.supplier, name: v}})} />
+                      <span className="text-gray-400 whitespace-nowrap">사업자번호</span>
+                      <EditableInput value={formatBusinessNumber(data.supplier.registrationNumber)} onChange={(v) => setData({...data, supplier: {...data.supplier, registrationNumber: v.replace(/-/g, '')}})} placeholder="000-00-00000" />
+                      <span className="text-gray-400">대표자</span>
+                      <EditableInput value={data.supplier.ownerName} onChange={(v) => setData({...data, supplier: {...data.supplier, ownerName: v}})} />
+                      <span className="text-gray-400">연락처</span>
+                      <EditableInput value={data.supplier.phone} onChange={(v) => setData({...data, supplier: {...data.supplier, phone: v}})} />
+                    </div>
+                    {(userInfo.name || userInfo.mobile || userInfo.email) && (
+                      <div className="border-t mt-1 pt-1 text-gray-600 text-xs">
+                        <div className="grid grid-cols-[50px_1fr] gap-x-2 gap-y-0.5 items-center">
+                          <span className="text-gray-400">담당</span>
+                          <span>{userInfo.name}{userInfo.position && ` (${userInfo.position})`}</span>
+                          {userInfo.mobile && <><span className="text-gray-400">연락처</span><span>{userInfo.mobile}</span></>}
+                          {userInfo.email && <><span className="text-gray-400">이메일</span><span>{userInfo.email}</span></>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              ))}
+
+                <p className="text-xs text-gray-500 mb-2">아래와 같이 공급합니다.</p>
+
+                {/* 테이블 */}
+                <div className="relative overflow-visible flex-1">
+                  <div className="text-right text-xs text-gray-500 mb-1">(단위: {settings.currency})</div>
+                  <table className="w-full border-collapse border border-black mb-2 text-sm table-fixed" style={{ wordBreak: 'break-word' }}>
+                    <colgroup>
+                      <col style={{ width: `${colWidths.no}%` }} />
+                      <col style={{ width: `${colWidths.name}%` }} />
+                      <col style={{ width: `${colWidths.spec}%` }} />
+                      <col style={{ width: `${colWidths.unit}%` }} />
+                      <col style={{ width: `${colWidths.qty}%` }} />
+                      <col style={{ width: `${colWidths.price}%` }} />
+                      <col style={{ width: `${colWidths.amount}%` }} />
+                      <col style={{ width: `${colWidths.note}%` }} />
+                    </colgroup>
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="border border-black p-1.5 text-center relative">No<div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-400 print:hidden" onMouseDown={(e) => handleColumnResize('no', e.clientX, colWidths.no)} /></th>
+                        <th className="border border-black p-1.5 text-center relative">품명<div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-400 print:hidden" onMouseDown={(e) => handleColumnResize('name', e.clientX, colWidths.name)} /></th>
+                        <th className="border border-black p-1.5 text-center relative">규격<div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-400 print:hidden" onMouseDown={(e) => handleColumnResize('spec', e.clientX, colWidths.spec)} /></th>
+                        <th className="border border-black p-1.5 text-center relative">단위<div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-400 print:hidden" onMouseDown={(e) => handleColumnResize('unit', e.clientX, colWidths.unit)} /></th>
+                        <th className="border border-black p-1.5 text-center relative">수량<div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-400 print:hidden" onMouseDown={(e) => handleColumnResize('qty', e.clientX, colWidths.qty)} /></th>
+                        <th className="border border-black p-1.5 text-center relative">단가<div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-400 print:hidden" onMouseDown={(e) => handleColumnResize('price', e.clientX, colWidths.price)} /></th>
+                        <th className="border border-black p-1.5 text-center relative">공급가액<div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-400 print:hidden" onMouseDown={(e) => handleColumnResize('amount', e.clientX, colWidths.amount)} /></th>
+                        <th className="border border-black p-1.5 text-center">비고</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.items.map((item, itemIndex) => (
+                        <tr key={item.id} className="group hover:bg-green-50/30 relative">
+                          <td className="border border-black p-1 text-center bg-gray-50">{itemIndex + 1}</td>
+                          <td className="border border-black p-0"><EditableInput value={item.name} onChange={(v) => handleItemChange(item.id, 'name', v)} align="left" multiline className="h-full px-2" /></td>
+                          <td className="border border-black p-0"><EditableInput value={item.spec} onChange={(v) => handleItemChange(item.id, 'spec', v)} align="left" multiline className="h-full px-1" /></td>
+                          <td className="border border-black p-0"><EditableInput value={item.unit} onChange={(v) => handleItemChange(item.id, 'unit', v)} align="center" className="h-full px-1" /></td>
+                          <td className="border border-black p-0"><EditableInput value={formatNumber(item.quantity)} onChange={(v) => handleItemChange(item.id, 'quantity', parseNumber(v))} align="center" className="h-full px-2" /></td>
+                          <td className="border border-black p-0"><NumberInput value={item.unitPrice} onChange={(v) => handleItemChange(item.id, 'unitPrice', v)} decimalPlaces={calcSettings.priceDecimalPlaces} align="right" className="h-full px-2" /></td>
+                          <td className="border border-black p-1 text-right font-medium bg-gray-50/50">{item.amount.toLocaleString()}</td>
+                          <td className="border border-black p-0 relative">
+                            <EditableInput value={item.note} onChange={(v) => handleItemChange(item.id, 'note', v)} align="center" multiline className="h-full px-2" />
+                            <div className="absolute left-full top-0 bottom-0 flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity print:hidden" data-html2canvas-ignore>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-green-500 hover:text-green-600 hover:bg-green-50" onClick={() => insertItemAfter(itemIndex)} title="아래에 항목 추가"><Plus className="w-3 h-3" /></Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => removeItem(item.id)} title="항목 삭제"><Trash2 className="w-3 h-3" /></Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="bg-gray-50">
+                        <td colSpan={6} className="border border-black p-2 text-center font-bold">소 계</td>
+                        <td colSpan={2} className="border border-black p-2 text-right font-bold">{data.subtotal.toLocaleString()} {settings.currency}</td>
+                      </tr>
+                      <tr className="bg-gray-50">
+                        <td colSpan={6} className="border border-black p-2 text-center font-bold">부 가 세</td>
+                        <td colSpan={2} className="border border-black p-2 text-right font-bold">{data.vat.toLocaleString()} {settings.currency}</td>
+                      </tr>
+                      <tr className="bg-gray-100">
+                        <td colSpan={6} className="border border-black p-2 text-center font-bold text-lg">총 합 계</td>
+                        <td colSpan={2} className="border border-black p-2 text-right font-bold text-lg text-green-600">{data.total.toLocaleString()} {settings.currency}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  
+                </div>
+
+                {/* 특수조건 */}
+                {settings.showSpecialTerms && (
+                  <div className="text-sm space-y-4 pt-2 flex-shrink-0 mt-2">
+                    <div className="flex gap-4 items-start pt-2">
+                      <span className="font-bold w-20 text-gray-700 mt-1">특수조건</span>
+                      <EditableTextarea value={data.remarks} onChange={(v) => setData({...data, remarks: v})} rows={3} placeholder="특수조건을 입력하세요" className="flex-1 border border-gray-200 rounded p-2" />
+                    </div>
+                  </div>
+                )}
+                
+                {/* Footer */}
+                <div className="text-center text-gray-400 text-xs flex-shrink-0 mt-auto pt-4">Generated by BizOrder</div>
+              </div>
             </div>
           </div>
         </ResizablePanel>

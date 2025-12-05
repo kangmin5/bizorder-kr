@@ -1,4 +1,4 @@
-import { FileText, User, CreditCard, LogOut, ChevronDown, LayoutDashboard, Settings } from 'lucide-react';
+import { FileText, User, CreditCard, LogOut, ChevronDown, LayoutDashboard, Settings, FolderOpen } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { UserProfile } from '../utils/auth';
@@ -46,12 +46,21 @@ export function Header({ isAuthenticated, userProfile, onSignOut, onOpenAuth }: 
               홈
             </Link>
             {isAuthenticated && (
-              <Link
-                to="/dashboard"
-                className={isActive('/dashboard')}
-              >
-                대시보드
-              </Link>
+              <>
+                <Link
+                  to="/dashboard"
+                  className={isActive('/dashboard')}
+                >
+                  대시보드
+                </Link>
+                <Link
+                  to="/documents"
+                  className={`${isActive('/documents')} flex items-center gap-1`}
+                >
+                  <FolderOpen className="w-4 h-4" />
+                  문서함
+                </Link>
+              </>
             )}
             <Link
               to="/quotation"

@@ -8,6 +8,7 @@ import { TransactionStatementPage } from './components/TransactionStatementPage'
 import { SubscriptionPage } from './components/SubscriptionPage';
 import { DashboardPage } from './components/DashboardPage';
 import { SettingsPage } from './components/SettingsPage';
+import { DocumentsPage } from './components/DocumentsPage';
 import { AuthModal } from './components/AuthModal';
 import { getSession, getUserProfile, signOut, updateSubscription, UserProfile } from './utils/auth';
 
@@ -94,6 +95,10 @@ export default function App() {
         <Route 
           path="/settings" 
           element={isAuthenticated ? <SettingsPage /> : <Navigate to="/" replace />} 
+        />
+        <Route 
+          path="/documents" 
+          element={isAuthenticated ? <DocumentsPage /> : <Navigate to="/" replace />} 
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

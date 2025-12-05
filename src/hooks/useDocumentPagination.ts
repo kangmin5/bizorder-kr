@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 export type PaperSize = 'A4' | 'A3' | 'B5';
+export type Orientation = 'portrait' | 'landscape';
 
 export interface SectionHeights {
   HEADER_FIRST: number;
@@ -8,16 +9,19 @@ export interface SectionHeights {
   TABLE_HEADER: number;
   ROW: number;
   SUMMARY_ROW: number;
-  REMARKS_BASE: number;
-  REMARKS_LINE: number;
+  REMARKS_BASE: number;   // 특수조건 기본 높이 (제목 등)
+  REMARKS_LINE: number;   // 특수조건 라인당 높이
   BUTTON: number;
   FOOTER: number;
+  BANNER_TOP?: number;    // 상단 배너 높이 (선택적)
 }
 
 export interface PaginationConfig {
   paperSize: PaperSize;
+  orientation: Orientation;
   margins: number;
   sectionHeights: SectionHeights;
+  hasBanner?: boolean;    // 상단 배너 유무
 }
 
 export interface PageItem<T> {
@@ -29,7 +33,8 @@ export interface Page<T> {
   items: PageItem<T>[];
   isFirst: boolean;
   isLast: boolean;
-  showButton: boolean;  // 버튼을 표시할 페이지 (아이템이 있는 마지막 페이지)
+  showButton: boolean;
+  remarksLines?: string[];  // 이 페이지에 표시할 특수조건 라인들
 }
 
 export function useDocumentPagination<T>(
@@ -54,105 +59,132 @@ export function useDocumentPagination<T>(
   return pages;
 }
 
+// 용지 크기별 치수 (mm)
+const PAPER_DIMENSIONS: Record<PaperSize, { width: number; height: number }> = {
+  A4: { width: 210, height: 297 },
+  A3: { width: 297, height: 420 },
+  B5: { width: 176, height: 250 },
+};
+
 // Improved version that takes pre-constructed rows
 export function usePageSplitter<T>(
   allRows: PageItem<T>[],
   remarks: string,
   config: PaginationConfig
 ) {
-  const { paperSize, margins, sectionHeights } = config;
+  const { paperSize, orientation, margins, sectionHeights, hasBanner } = config;
 
   const pages = useMemo(() => {
-    let totalPageHeight = 297;
-    if (paperSize === 'A3') totalPageHeight = 420;
-    if (paperSize === 'B5') totalPageHeight = 250;
-
-    // Margin safety buffer (50mm total for top/bottom margins)
-    const contentHeight = totalPageHeight - 50; 
+    // 1. 용지 크기와 방향에 따른 실제 페이지 높이 계산
+    const paperDim = PAPER_DIMENSIONS[paperSize];
+    const pageHeight = orientation === 'landscape' ? paperDim.width : paperDim.height;
+    
+    // 2. 콘텐츠 영역 높이 (상하 마진 제외)
+    const contentHeight = pageHeight - (margins * 2);
+    
+    // 3. 상단 배너 높이 (있는 경우)
+    const bannerHeight = hasBanner && sectionHeights.BANNER_TOP ? sectionHeights.BANNER_TOP : 0;
+    
+    // 4. 특수조건 라인 분리
+    const remarksLineArray = remarks ? remarks.split('\n') : [];
+    const totalRemarksLines = remarksLineArray.length;
+    
+    // 5. 하단 고정 높이 (버튼 + 푸터)
+    const fixedBottomHeight = sectionHeights.BUTTON + sectionHeights.FOOTER;
 
     const resultPages: Page<T>[] = [];
     let currentPageItems: PageItem<T>[] = [];
-    let currentHeight = sectionHeights.HEADER_FIRST + sectionHeights.TABLE_HEADER;
+    
+    // 6. 첫 페이지 시작 높이 (헤더 + 배너 + 테이블헤더)
+    let currentHeight = sectionHeights.HEADER_FIRST + bannerHeight + sectionHeights.TABLE_HEADER;
+    let isFirstPage = true;
 
+    // 7. 품목 행 처리
     for (let i = 0; i < allRows.length; i++) {
       const row = allRows[i];
       
-      // 1. Calculate Row Height
+      // 행 높이 계산
       let rowHeight = sectionHeights.ROW;
       if (row.type !== 'item') {
         rowHeight = sectionHeights.SUMMARY_ROW;
       }
 
-      // 2. Check Page Overflow
-      if (currentHeight + rowHeight > contentHeight) {
+      // 최소 특수조건 높이 (최소 1줄 + 기본 높이)
+      const minRemarksHeight = sectionHeights.REMARKS_BASE + sectionHeights.REMARKS_LINE;
+
+      // 페이지 넘침 체크
+      if (currentHeight + rowHeight + minRemarksHeight + fixedBottomHeight > contentHeight) {
+        // 현재 페이지 저장
         resultPages.push({
           items: currentPageItems,
-          isFirst: resultPages.length === 0,
+          isFirst: isFirstPage,
           isLast: false,
-          showButton: false
+          showButton: false,
+          remarksLines: []
         });
+        
+        // 새 페이지 시작
         currentPageItems = [];
         currentHeight = sectionHeights.HEADER_NEXT + sectionHeights.TABLE_HEADER;
+        isFirstPage = false;
       }
 
-      // 3. Add Row
+      // 행 추가
       currentPageItems.push(row);
       currentHeight += rowHeight;
     }
 
-    // 5. Handle Bottom Section (Remarks + Button + Footer)
-    const remarksLines = (remarks.match(/\n/g) || []).length + 1;
-    const remarksHeight = Math.max(3, remarksLines);
-    const remarksTotalHeight = sectionHeights.REMARKS_BASE + (remarksHeight * sectionHeights.REMARKS_LINE);
-    const bottomSectionHeight = remarksTotalHeight + sectionHeights.BUTTON + sectionHeights.FOOTER;
-
-    // 버튼만 포함한 높이 계산 (비고 제외)
-    const buttonOnlyHeight = sectionHeights.BUTTON;
+    // 8. 특수조건 처리
+    // 현재 페이지에서 특수조건에 사용 가능한 높이
+    let availableForRemarks = contentHeight - currentHeight - fixedBottomHeight - sectionHeights.REMARKS_BASE;
+    let maxLinesInPage = Math.max(0, Math.floor(availableForRemarks / sectionHeights.REMARKS_LINE));
     
-    if (currentHeight + bottomSectionHeight > contentHeight) {
-      // 비고가 안 들어감 → 버튼은 현재 페이지에, 비고는 다음 페이지로
-      if (currentHeight + buttonOnlyHeight <= contentHeight) {
-        // 버튼은 들어감 → 현재 페이지에 버튼 표시
-        resultPages.push({
-          items: currentPageItems,
-          isFirst: resultPages.length === 0,
-          isLast: false,
-          showButton: true  // 버튼 표시
-        });
-        // 비고만 있는 새 페이지
-        resultPages.push({
-          items: [],
-          isFirst: false,
-          isLast: true,
-          showButton: false
-        });
-      } else {
-        // 버튼도 안 들어감 → 둘 다 다음 페이지로
-        resultPages.push({
-          items: currentPageItems,
-          isFirst: resultPages.length === 0,
-          isLast: false,
-          showButton: false
-        });
-        resultPages.push({
-          items: [],
-          isFirst: false,
-          isLast: true,
-          showButton: true  // 비고 페이지에 버튼도 표시
-        });
-      }
-    } else {
-      // 모두 들어감 → 현재 페이지가 마지막
+    let remarksIndex = 0;
+    
+    if (totalRemarksLines <= maxLinesInPage) {
+      // 모든 특수조건이 현재 페이지에 들어감
       resultPages.push({
         items: currentPageItems,
-        isFirst: resultPages.length === 0,
+        isFirst: isFirstPage,
         isLast: true,
-        showButton: true
+        showButton: true,
+        remarksLines: remarksLineArray
       });
+    } else {
+      // 특수조건이 여러 페이지에 걸쳐 표시됨
+      // 현재 페이지에 들어갈 수 있는 만큼 추가
+      const firstPageRemarks = remarksLineArray.slice(0, maxLinesInPage);
+      remarksIndex = maxLinesInPage;
+      
+      resultPages.push({
+        items: currentPageItems,
+        isFirst: isFirstPage,
+        isLast: false,
+        showButton: true,
+        remarksLines: firstPageRemarks
+      });
+      
+      // 나머지 특수조건을 새 페이지들에 분할
+      while (remarksIndex < totalRemarksLines) {
+        // 새 페이지에서 특수조건에 사용 가능한 높이
+        const newPageAvailable = contentHeight - sectionHeights.HEADER_NEXT - fixedBottomHeight - sectionHeights.REMARKS_BASE;
+        const linesPerPage = Math.max(1, Math.floor(newPageAvailable / sectionHeights.REMARKS_LINE));
+        
+        const pageRemarks = remarksLineArray.slice(remarksIndex, remarksIndex + linesPerPage);
+        remarksIndex += linesPerPage;
+        
+        resultPages.push({
+          items: [],
+          isFirst: false,
+          isLast: remarksIndex >= totalRemarksLines,
+          showButton: false,
+          remarksLines: pageRemarks
+        });
+      }
     }
 
     return resultPages;
-  }, [allRows, remarks, paperSize, margins, sectionHeights]);
+  }, [allRows, remarks, paperSize, orientation, margins, sectionHeights, hasBanner]);
 
   return pages;
 }
