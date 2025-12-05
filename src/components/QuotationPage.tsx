@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
 import { QuotationPDF } from './pdf/QuotationPDF';
+import { PDFPreviewModal } from './pdf/PDFPreviewModal';
 import * as XLSX from 'xlsx';
 import { type ImperativePanelHandle } from "react-resizable-panels";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable";
@@ -366,6 +367,10 @@ export function QuotationPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const sidebarRef = useRef<ImperativePanelHandle>(null);
   
+  // PDF 미리보기 모달 상태
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  
   // 양식 선택 상태
   const [selectedTemplate, setSelectedTemplate] = useState<QuotationTemplate>(QUOTATION_TEMPLATES[0]);
   
@@ -631,6 +636,8 @@ export function QuotationPage() {
           address: data.client.address || '',
           phone: data.client.phone || '',
           email: data.client.email || '',
+          department: data.client.department || '',
+          position: data.client.position || '',
         },
         items: data.items,
         subtotal: data.subtotal,
@@ -650,16 +657,13 @@ export function QuotationPage() {
           bannerImage={bannerSettings.position === 'top' && bannerSettings.bannerImage ? bannerSettings.bannerImage : undefined}
           stampImage={bannerSettings.stampImage || undefined}
           showRemarks={settings.showSpecialTerms}
+          userInfo={userInfo}
         />
       ).toBlob();
 
-      // 다운로드
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${data.quotationNumber}_견적서.pdf`;
-      link.click();
-      URL.revokeObjectURL(url);
+      // 미리보기 모달 열기
+      setPdfBlob(blob);
+      setPdfPreviewOpen(true);
     } catch (error) {
       console.error('PDF Export failed:', error);
       alert('PDF 생성 중 오류가 발생했습니다.');
@@ -1225,6 +1229,17 @@ export function QuotationPage() {
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
+      
+      {/* PDF 미리보기 모달 */}
+      <PDFPreviewModal
+        isOpen={pdfPreviewOpen}
+        onClose={() => {
+          setPdfPreviewOpen(false);
+          setPdfBlob(null);
+        }}
+        pdfBlob={pdfBlob}
+        fileName={`${data.quotationNumber}_견적서.pdf`}
+      />
     </div>
   );
 }

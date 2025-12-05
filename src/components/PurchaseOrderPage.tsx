@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
 import { PurchaseOrderPDF } from './pdf/PurchaseOrderPDF';
+import { PDFPreviewModal } from './pdf/PDFPreviewModal';
 import * as XLSX from 'xlsx';
 import { type ImperativePanelHandle } from "react-resizable-panels";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable";
@@ -283,6 +284,11 @@ export function PurchaseOrderPage() {
   const [zoom, setZoom] = useState(100);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const sidebarRef = useRef<ImperativePanelHandle>(null);
+  
+  // PDF 미리보기 모달 상태
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  
   const [settings, setSettings] = useState<PageSettings>({
     paperSize: 'A4',
     orientation: 'portrait',
@@ -547,16 +553,13 @@ export function PurchaseOrderPage() {
           bannerImage={bannerSettings.position === 'top' && bannerSettings.bannerImage ? bannerSettings.bannerImage : undefined}
           stampImage={bannerSettings.stampImage || undefined}
           showRemarks={settings.showSpecialTerms}
+          userInfo={userInfo}
         />
       ).toBlob();
 
-      // 다운로드
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `발주서_${data.orderNumber}.pdf`;
-      link.click();
-      URL.revokeObjectURL(url);
+      // 미리보기 모달 열기
+      setPdfBlob(blob);
+      setPdfPreviewOpen(true);
     } catch (error) {
       console.error('PDF 생성 오류:', error);
       alert('PDF 생성 중 오류가 발생했습니다.');
@@ -951,6 +954,17 @@ export function PurchaseOrderPage() {
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
+      
+      {/* PDF 미리보기 모달 */}
+      <PDFPreviewModal
+        isOpen={pdfPreviewOpen}
+        onClose={() => {
+          setPdfPreviewOpen(false);
+          setPdfBlob(null);
+        }}
+        pdfBlob={pdfBlob}
+        fileName={`발주서_${data.orderNumber}.pdf`}
+      />
     </div>
   );
 }
