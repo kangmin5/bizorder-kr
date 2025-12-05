@@ -11,8 +11,8 @@ import {
   Save,
   FolderOpen,
 } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+import { pdf } from '@react-pdf/renderer';
+import { QuotationPDF } from './pdf/QuotationPDF';
 import * as XLSX from 'xlsx';
 import { type ImperativePanelHandle } from "react-resizable-panels";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable";
@@ -139,7 +139,7 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
     columns: [
       { key: 'no', label: 'No', width: 5, type: 'text', align: 'center' },
       { key: 'name', label: '품명', width: 40, type: 'text', align: 'left' },
-      { key: 'unit', label: '단위(M/M)', width: 10, type: 'text', align: 'center' },
+      { key: 'unit', label: '단위', width: 10, type: 'text', align: 'center' },
       { key: 'quantity', label: '개월', width: 10, type: 'number', align: 'center' },
       { key: 'unitPrice', label: '월단가', width: 15, type: 'currency', align: 'right' },
       { key: 'amount', label: '공급가액', width: 20, type: 'currency', align: 'right' },
@@ -544,7 +544,11 @@ export function QuotationPage() {
 
   // 특정 인덱스 뒤에 항목 삽입
   const insertItemAfter = (index: number) => {
-    const newItem = { ...INITIAL_ITEM, id: Math.random().toString(36).substr(2, 9) };
+    const newItem = { 
+      ...INITIAL_ITEM, 
+      id: Math.random().toString(36).substr(2, 9),
+      unit: selectedTemplate.defaultUnit || 'EA'  // 템플릿의 기본 단위 사용
+    };
     const newItems = [...data.items];
     newItems.splice(index + 1, 0, newItem);
     setData({ ...data, items: newItems });
@@ -604,33 +608,58 @@ export function QuotationPage() {
   };
 
   const handleExportPDF = async () => {
-    if (!printRef.current) return;
     setIsLoading(true);
 
     try {
-      const pages = printRef.current.querySelectorAll('.page-break');
-      const pdf = new jsPDF({
-        orientation: settings.orientation,
-        unit: 'mm',
-        format: settings.paperSize.toLowerCase(),
-      });
+      // PDF 데이터 변환
+      const pdfData = {
+        quotationNumber: data.quotationNumber,
+        date: data.date,
+        validUntil: data.validUntil,
+        supplier: {
+          name: data.supplier.name,
+          representative: data.supplier.ownerName,
+          businessNumber: data.supplier.registrationNumber,
+          address: data.supplier.address,
+          phone: data.supplier.phone,
+          email: data.supplier.email || '',
+        },
+        client: {
+          name: data.client.name,
+          representative: data.client.ownerName || '',
+          businessNumber: data.client.registrationNumber,
+          address: data.client.address || '',
+          phone: data.client.phone || '',
+          email: data.client.email || '',
+        },
+        items: data.items,
+        subtotal: data.subtotal,
+        vat: data.vat,
+        total: data.total,
+        vatIncluded: data.vatIncluded,
+        remarks: data.remarks,
+        paymentTerms: data.paymentTerms,
+        deliveryTerms: data.deliveryTerms,
+      };
 
-      for (let i = 0; i < pages.length; i++) {
-        const page = pages[i] as HTMLElement;
-        const canvas = await html2canvas(page, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-        });
+      // PDF 생성
+      const blob = await pdf(
+        <QuotationPDF 
+          data={pdfData}
+          currency={settings.currency}
+          bannerImage={bannerSettings.position === 'top' && bannerSettings.bannerImage ? bannerSettings.bannerImage : undefined}
+          stampImage={bannerSettings.stampImage || undefined}
+          showRemarks={settings.showSpecialTerms}
+        />
+      ).toBlob();
 
-        const imgData = canvas.toDataURL('image/png');
-        const { width, height } = getPaperDimensions();
-        
-        if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, 0, width, height);
-      }
-
-      pdf.save(`${data.quotationNumber}_견적서.pdf`);
+      // 다운로드
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${data.quotationNumber}_견적서.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error('PDF Export failed:', error);
       alert('PDF 생성 중 오류가 발생했습니다.');
@@ -786,7 +815,15 @@ export function QuotationPage() {
                       const template = QUOTATION_TEMPLATES.find(t => t.id === v);
                       if (template) {
                         setSelectedTemplate(template);
-                        setData(prev => ({ ...prev, remarks: template.defaultSpecialTerms || '' }));
+                        // 템플릿 변경 시 기존 아이템의 단위도 업데이트
+                        setData(prev => ({ 
+                          ...prev, 
+                          remarks: template.defaultSpecialTerms || '',
+                          items: prev.items.map(item => ({
+                            ...item,
+                            unit: template.defaultUnit || 'EA'
+                          }))
+                        }));
                       }
                     }}
                   >

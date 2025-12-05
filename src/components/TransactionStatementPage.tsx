@@ -11,8 +11,8 @@ import {
   Save,
   FolderOpen,
 } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+import { pdf } from '@react-pdf/renderer';
+import { TransactionStatementPDF } from './pdf/TransactionStatementPDF';
 import * as XLSX from 'xlsx';
 import { type ImperativePanelHandle } from "react-resizable-panels";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable";
@@ -502,22 +502,58 @@ export function TransactionStatementPage() {
   };
 
   const handleExportPDF = async () => {
-    if (!printRef.current) return;
     setIsLoading(true);
     try {
-      const { width, height } = getPaperDimensions();
-      const pdf = new jsPDF({ orientation: settings.orientation, unit: 'mm', format: [width, height] });
-      const pages = printRef.current.querySelectorAll('.page-break');
-      for (let i = 0; i < pages.length; i++) {
-        const page = pages[i] as HTMLElement;
-        const canvas = await html2canvas(page, { scale: 2, useCORS: true, logging: false });
-        const imgData = canvas.toDataURL('image/png');
-        if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, 0, width, height);
-      }
-      pdf.save(`거래명세서_${data.statementNumber}.pdf`);
+      // PDF 데이터 변환
+      const pdfData = {
+        statementNumber: data.statementNumber,
+        date: data.date,
+        supplier: {
+          name: data.supplier.name,
+          representative: data.supplier.ownerName,
+          businessNumber: data.supplier.registrationNumber,
+          address: data.supplier.address,
+          phone: data.supplier.phone,
+          email: data.supplier.email || '',
+        },
+        client: {
+          name: data.client.name,
+          representative: data.client.ownerName || '',
+          businessNumber: data.client.registrationNumber,
+          address: data.client.address || '',
+          phone: data.client.phone || '',
+          email: data.client.email || '',
+        },
+        items: data.items,
+        subtotal: data.subtotal,
+        vat: data.vat,
+        total: data.total,
+        vatIncluded: data.vatIncluded,
+        remarks: data.remarks,
+        paymentTerms: data.paymentTerms,
+      };
+
+      // PDF 생성
+      const blob = await pdf(
+        <TransactionStatementPDF 
+          data={pdfData}
+          currency={settings.currency}
+          bannerImage={bannerSettings.position === 'top' && bannerSettings.bannerImage ? bannerSettings.bannerImage : undefined}
+          stampImage={bannerSettings.stampImage || undefined}
+          showRemarks={settings.showSpecialTerms}
+        />
+      ).toBlob();
+
+      // 다운로드
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `거래명세서_${data.statementNumber}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error('PDF 생성 오류:', error);
+      alert('PDF 생성 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
     }

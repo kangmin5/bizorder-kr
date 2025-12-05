@@ -11,8 +11,8 @@ import {
   Save,
   FolderOpen,
 } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+import { pdf } from '@react-pdf/renderer';
+import { PurchaseOrderPDF } from './pdf/PurchaseOrderPDF';
 import * as XLSX from 'xlsx';
 import { type ImperativePanelHandle } from "react-resizable-panels";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable";
@@ -506,22 +506,60 @@ export function PurchaseOrderPage() {
   };
 
   const handleExportPDF = async () => {
-    if (!printRef.current) return;
     setIsLoading(true);
     try {
-      const { width, height } = getPaperDimensions();
-      const pdf = new jsPDF({ orientation: settings.orientation, unit: 'mm', format: [width, height] });
-      const pages = printRef.current.querySelectorAll('.page-break');
-      for (let i = 0; i < pages.length; i++) {
-        const page = pages[i] as HTMLElement;
-        const canvas = await html2canvas(page, { scale: 2, useCORS: true, logging: false });
-        const imgData = canvas.toDataURL('image/png');
-        if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, 0, width, height);
-      }
-      pdf.save(`발주서_${data.orderNumber}.pdf`);
+      // PDF 데이터 변환
+      const pdfData = {
+        orderNumber: data.orderNumber,
+        date: data.date,
+        deliveryDate: data.deliveryDate,
+        buyer: {
+          name: data.orderer.name,
+          representative: data.orderer.ownerName,
+          businessNumber: data.orderer.registrationNumber,
+          address: data.orderer.address,
+          phone: data.orderer.phone,
+          email: data.orderer.email || '',
+        },
+        supplier: {
+          name: data.supplier.name,
+          representative: data.supplier.ownerName || '',
+          businessNumber: data.supplier.registrationNumber,
+          address: data.supplier.address || '',
+          phone: data.supplier.phone || '',
+          email: data.supplier.email || '',
+        },
+        items: data.items,
+        subtotal: data.subtotal,
+        vat: data.vat,
+        total: data.total,
+        vatIncluded: data.vatIncluded,
+        remarks: data.remarks,
+        paymentTerms: data.paymentTerms,
+        deliveryTerms: data.deliveryTerms,
+      };
+
+      // PDF 생성
+      const blob = await pdf(
+        <PurchaseOrderPDF 
+          data={pdfData}
+          currency={settings.currency}
+          bannerImage={bannerSettings.position === 'top' && bannerSettings.bannerImage ? bannerSettings.bannerImage : undefined}
+          stampImage={bannerSettings.stampImage || undefined}
+          showRemarks={settings.showSpecialTerms}
+        />
+      ).toBlob();
+
+      // 다운로드
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `발주서_${data.orderNumber}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error('PDF 생성 오류:', error);
+      alert('PDF 생성 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
     }
